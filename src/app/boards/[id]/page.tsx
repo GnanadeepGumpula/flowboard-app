@@ -1,5 +1,5 @@
 "use client";
-
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { DndContext, closestCenter, DragOverlay, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, useDroppable } from "@dnd-kit/core";
@@ -53,20 +53,33 @@ const isValidUuid = (value: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-
 
 function SortableTaskCard({ task, members, onDeleteTask }: { task: TaskItem; members: BoardMember[]; onDeleteTask: (taskId: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? "none" : transition,
+    transition,
     touchAction: "none",
-    transformOrigin: "center center",
   };
+  
   const assignedMember = members.find((member) => member.user_id === task.assigned_to);
   const initials = (assignedMember?.profiles?.full_name || assignedMember?.profiles?.email || "U").split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={`cursor-grab rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 hover:scale-[1.01] hover:border-indigo-300 hover:shadow-md ${isDragging ? "scale-105 rotate-1 border-indigo-300 shadow-xl ring-2 ring-indigo-200" : ""}`}>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      {...attributes} 
+      {...listeners} 
+      className={`cursor-grab rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 hover:border-indigo-300 hover:shadow-md ${
+        isDragging ? "opacity-30 border-dashed border-indigo-300 shadow-none pointer-events-none" : ""
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold text-slate-900">{task.name}</p>
-        <button type="button" onClick={(event) => { event.stopPropagation(); onDeleteTask(task.id); }} className="rounded-md border border-rose-200 bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-100">
+        <button 
+          type="button" 
+          onClick={(event) => { event.stopPropagation(); onDeleteTask(task.id); }} 
+          className="rounded-md border border-rose-200 bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-100"
+        >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -141,7 +154,7 @@ export default function BoardPage() {
   const [taskDescription, setTaskDescription] = useState("");
   const [taskStatus, setTaskStatus] = useState<"todo" | "inprogress" | "done">("todo");
   const [taskDueDate, setTaskDueDate] = useState("");
-  const [taskAssignee, setTaskAssignee] = useState("unassignedunassigned");
+  const [taskAssignee, setTaskAssignee] = useState("unassigned");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("Update Progress");
   const [verifiedUser, setVerifiedUser] = useState<any>(null);
@@ -577,14 +590,18 @@ export default function BoardPage() {
             );
           })}
         </div>
-        <DragOverlay adjustScale={false} dropAnimation={{ duration: 0 }} zIndex={1000}>
-          {activeTask ? (
-            <div className="w-72 rounded-2xl border border-indigo-300 bg-white p-3 shadow-2xl ring-2 ring-indigo-200" style={{ pointerEvents: "none" }}>
-              <p className="text-sm font-semibold text-slate-900">{activeTask.name}</p>
-              <p className="mt-2 text-sm text-slate-500">{activeTask.description || "Dragging task"}</p>
-            </div>
-          ) : null}
-        </DragOverlay>
+        {typeof window !== "undefined" &&
+  createPortal(
+    <DragOverlay zIndex={9999}>
+      {activeTask ? (
+        <div className="w-72 scale-105 rotate-1 rounded-2xl border border-indigo-300 bg-white p-3 shadow-2xl ring-2 ring-indigo-200 cursor-grabbing pointer-events-none">
+          <p className="text-sm font-semibold text-slate-900">{activeTask.name}</p>
+          <p className="mt-2 text-sm text-slate-500 line-clamp-2">{activeTask.description || "Dragging task"}</p>
+        </div>
+      ) : null}
+    </DragOverlay>,
+    document.body
+  )}
       </DndContext>
     </div>
   );
