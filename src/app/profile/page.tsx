@@ -53,7 +53,7 @@ export default function ProfilePage() {
         supabase.from("profiles").select("id, email, full_name, avatar_url").eq("id", userId).single(),
         supabase.from("boards").select("id, name, description").eq("created_by", userId).order("name"),
         supabase.from("board_members").select("board_id").eq("user_id", userId).eq("status", "Accepted"),
-        supabase.from("tasks").select("id, name, board_id").eq("assigned_to", userId).eq("status", "done"),
+        supabase.from("tasks").select("id, name, board_id").contains("assigned_to", [userId]).eq("status", "done"),
       ]);
 
       const boardIds = (acceptedMemberships ?? []).map((entry: any) => entry.board_id).filter(Boolean);

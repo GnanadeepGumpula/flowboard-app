@@ -30,7 +30,7 @@ interface TaskItem {
   description: string | null;
   status: "todo" | "inprogress" | "done";
   due_date: string | null;
-  assigned_to: string | null;
+  assigned_to: string[] | null;
   created_by?: string | null;
 }
 
@@ -60,7 +60,7 @@ function SortableTaskCard({ task, members, onDeleteTask }: { task: TaskItem; mem
     touchAction: "none",
   };
   
-  const assignedMember = members.find((member) => member.user_id === task.assigned_to);
+  const assignedMember = task.assigned_to ? members.find((member) => task.assigned_to?.includes(member.user_id)) : undefined;
   const initials = (assignedMember?.profiles?.full_name || assignedMember?.profiles?.email || "U").split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 
   return (
@@ -87,12 +87,16 @@ function SortableTaskCard({ task, members, onDeleteTask }: { task: TaskItem; mem
       <div className="mt-3 flex items-center justify-between gap-2 text-xs text-slate-500">
         <span className="rounded-full bg-slate-100 px-2 py-1">{task.due_date ? format(new Date(task.due_date), "MMM d") : "No due date"}</span>
         <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
-          {assignedMember?.profiles?.avatar_url ? (
-            <img src={assignedMember.profiles.avatar_url} alt={assignedMember.profiles.full_name || assignedMember.profiles.email || "Assignee"} className="h-5 w-5 rounded-full object-cover" />
+          {assignedMember ? (
+            assignedMember.profiles?.avatar_url ? (
+              <img src={assignedMember.profiles.avatar_url} alt={assignedMember.profiles.full_name || assignedMember.profiles.email || "Assignee"} className="h-5 w-5 rounded-full object-cover" />
+            ) : (
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">{initials}</div>
+            )
           ) : (
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">{initials}</div>
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">U</div>
           )}
-          <span className="max-w-[90px] truncate">{assignedMember?.profiles?.full_name || assignedMember?.profiles?.email || "Unassigned"}</span>
+          <span className="max-w-[90px] truncate">{task.assigned_to && task.assigned_to.length > 0 ? (assignedMember?.profiles?.full_name || assignedMember?.profiles?.email || "Assignees") + (task.assigned_to.length > 1 ? ` +${task.assigned_to.length - 1}` : "") : "Unassigned"}</span>
         </div>
       </div>
     </div>
@@ -155,6 +159,7 @@ export default function BoardPage() {
   const [taskStatus, setTaskStatus] = useState<"todo" | "inprogress" | "done">("todo");
   const [taskDueDate, setTaskDueDate] = useState("");
   const [taskAssignee, setTaskAssignee] = useState("unassigned");
+  const [taskAssignees, setTaskAssignees] = useState<string[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("Update Progress");
   const [verifiedUser, setVerifiedUser] = useState<any>(null);
@@ -226,6 +231,7 @@ export default function BoardPage() {
     setTaskStatus("todo");
     setTaskDueDate("");
     setTaskAssignee("unassigned");
+    setTaskAssignees([]);
     setTaskModalOpen(false);
   };
 
@@ -257,7 +263,7 @@ export default function BoardPage() {
       description: taskDescription,
       status: taskStatus,
       due_date: taskDueDate || null,
-      assigned_to: taskAssignee === "unassigned" ? null : taskAssignee,
+      assigned_to: taskAssignees.length === 0 ? null : taskAssignees,
     };
     const { data, error } = await supabase.from("tasks").insert(payload).select("id").single();
     if (error || !data) {
@@ -266,16 +272,18 @@ export default function BoardPage() {
       setTaskLoading(false);
       return;
     }
-    if (taskAssignee !== "unassigned") {
+    if (taskAssignees.length > 0) {
       const currentUserName = userData.user?.user_metadata?.full_name || userData.user?.email || "A teammate";
       const { data: boardData } = await supabase.from("boards").select("name").eq("id", boardId).single();
-      await supabase.rpc("create_notification", {
-        p_user_id: taskAssignee,
-        p_title: "Task assignment request",
-        p_message: `${currentUserName} assigned you to "${taskName}" in "${boardData?.name || "a board"}".`,
-        p_type: "task_assignment_request",
-        p_related_id: data.id,
-      });
+      for (const assignee of taskAssignees) {
+        await supabase.rpc("create_notification", {
+          p_user_id: assignee,
+          p_title: "Task assignment request",
+          p_message: `${currentUserName} assigned you to "${taskName}" in "${boardData?.name || "a board"}".`,
+          p_type: "task_assignment_request",
+          p_related_id: data.id,
+        });
+      }
     }
     setTasks((current) => [...current, { ...payload, id: data.id, created_by: currentUserId } as TaskItem]);
     toast.success("Task created");
@@ -511,18 +519,31 @@ export default function BoardPage() {
                   <Input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
                 </div>
                 <div>
-                  <Label>Assignee</Label>
-                  <Select value={taskAssignee} onValueChange={(value: string) => setTaskAssignee(value)}>
-                    <SelectTrigger><SelectValue placeholder="Select assignee" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {members.map((member) => (
-                        <SelectItem key={member.id} value={member.user_id}>
-                          {member.profiles?.full_name || member.profiles?.email || "Member"}{member.status === "Pending" ? " (Pending)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Assignee(s)</Label>
+                  <div className="mt-2 flex max-h-40 flex-col gap-2 overflow-auto">
+                    <button type="button" onClick={() => { setTaskAssignees([]); setTaskAssignee('unassigned'); }} className={`text-left rounded-lg px-3 py-2 ${taskAssignees.length === 0 ? 'bg-indigo-50 border border-indigo-200' : 'border border-slate-100'}`}>
+                      Unassigned
+                    </button>
+                    {members.map((member) => {
+                      const selected = taskAssignees.includes(member.user_id);
+                      return (
+                        <button key={member.id} type="button" onClick={() => {
+                          setTaskAssignee('');
+                          setTaskAssignees((current) => selected ? current.filter((id) => id !== member.user_id) : [...current, member.user_id]);
+                        }} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left ${selected ? 'bg-indigo-50 border border-indigo-200' : 'border border-slate-100'}`}>
+                          {member.profiles?.avatar_url ? (
+                            <img src={member.profiles.avatar_url} alt={member.profiles.full_name || member.profiles.email || 'Member'} className="h-6 w-6 rounded-full object-cover" />
+                          ) : (
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">{(member.profiles?.full_name || member.profiles?.email || 'U').charAt(0).toUpperCase()}</div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-sm">{member.profiles?.full_name || member.profiles?.email}</div>
+                            <div className="text-xs text-slate-500">{member.status === 'Pending' ? 'Pending' : member.role}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={saveTask} disabled={taskLoading}>{taskLoading ? "Saving..." : "Create task"}</Button>

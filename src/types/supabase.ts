@@ -102,7 +102,7 @@ export type Database = {
           description: string | null;
           status: "todo" | "inprogress" | "done";
           due_date: string | null;
-          assigned_to: string | null;
+          assigned_to: string[] | null;
         };
         Insert: {
           id?: string;
@@ -112,7 +112,7 @@ export type Database = {
           description?: string | null;
           status?: "todo" | "inprogress" | "done";
           due_date?: string | null;
-          assigned_to?: string | null;
+          assigned_to?: string[] | null;
         };
         Update: {
           id?: string;
@@ -122,7 +122,7 @@ export type Database = {
           description?: string | null;
           status?: "todo" | "inprogress" | "done";
           due_date?: string | null;
-          assigned_to?: string | null;
+          assigned_to?: string[] | null;
         };
         Relationships: [];
       };

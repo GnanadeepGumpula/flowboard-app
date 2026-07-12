@@ -68,7 +68,7 @@ export function AppShell({ children }: AppShellProps) {
   useEffect(() => {
     if (!user) return;
     const loadNotifications = async () => {
-      const { data } = await supabase.from("notifications").select("*").eq("user_id", user.id).order("id", { ascending: false });
+      const { data } = await supabase.from("notifications").select("*").eq("user_id", user.id).eq("is_read", false).order("id", { ascending: false });
       setNotifications((data ?? []) as any[]);
     };
     loadNotifications();
@@ -149,11 +149,18 @@ export function AppShell({ children }: AppShellProps) {
   const respondToAssignment = async (notification: any, accepted: boolean) => {
     if (!notification.related_id || !user) return;
     const taskId = notification.related_id;
-    const { data: taskData } = await supabase.from("tasks").select("id, name, created_by, board_id").eq("id", taskId).single();
+    const { data: taskData } = await supabase.from("tasks").select("id, name, created_by, board_id, assigned_to").eq("id", taskId).single();
     if (!taskData) return;
     const { data: boardData } = await supabase.from("boards").select("name").eq("id", taskData.board_id).single();
     const boardName = boardData?.name || "a board";
-    const { error } = await supabase.from("tasks").update({ assigned_to: accepted ? user.id : null }).eq("id", taskId);
+    const existingAssigned: string[] = taskData.assigned_to ?? [];
+    let newAssigned: string[] = [];
+    if (accepted) {
+      newAssigned = Array.from(new Set([...existingAssigned, user.id]));
+    } else {
+      newAssigned = existingAssigned.filter((id) => id !== user.id);
+    }
+    const { error } = await supabase.from("tasks").update({ assigned_to: newAssigned.length ? newAssigned : null }).eq("id", taskId);
     if (error) {
       toast.error("Unable to update assignment");
       return;

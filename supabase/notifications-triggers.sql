@@ -46,7 +46,8 @@ DECLARE
   v_task record;
   v_days integer;
   v_title text;
-  v_message text;
+  v_msg text;
+  v_user uuid;
 BEGIN
   SELECT t.id, t.name, t.board_id, t.assigned_to, t.status, t.due_date, b.name AS board_name
   INTO v_task
@@ -62,11 +63,13 @@ BEGIN
     RETURN;
   END IF;
 
-  v_days := DATE_PART('day', v_task.due_date::date - CURRENT_DATE)::int;
+  -- `date - date` returns an integer number of days in Postgres, so avoid calling
+  -- date_part with an integer which causes "function date_part(unknown, integer) does not exist".
+  v_days := (v_task.due_date::date - CURRENT_DATE)::int;
 
   IF v_days < 0 THEN
     DELETE FROM public.notifications
-    WHERE user_id = v_task.assigned_to
+    WHERE user_id = ANY(v_task.assigned_to)
       AND type = 'task_due'
       AND related_id = p_task_id;
     RETURN;
@@ -78,25 +81,28 @@ BEGIN
 
   IF v_days = 0 THEN
     v_title := 'Task due today';
-    v_message := format('"%s" in "%s" is due today.', v_task.name, COALESCE(v_task.board_name, 'the board'));
+    v_msg := format('"%s" in "%s" is due today.', v_task.name, COALESCE(v_task.board_name, 'the board'));
   ELSIF v_days = 1 THEN
     v_title := 'Task due tomorrow';
-    v_message := format('"%s" in "%s" is due tomorrow.', v_task.name, COALESCE(v_task.board_name, 'the board'));
+    v_msg := format('"%s" in "%s" is due tomorrow.', v_task.name, COALESCE(v_task.board_name, 'the board'));
   ELSE
     v_title := 'Task due soon';
-    v_message := format('"%s" in "%s" is due in 2 days.', v_task.name, COALESCE(v_task.board_name, 'the board'));
+    v_msg := format('"%s" in "%s" is due in 2 days.', v_task.name, COALESCE(v_task.board_name, 'the board'));
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.notifications
-    WHERE user_id = v_task.assigned_to
-      AND type = 'task_due'
-      AND related_id = p_task_id
-      AND message = v_message
-  ) THEN
-    PERFORM public.create_notification(v_task.assigned_to, v_title, v_message, 'task_due', p_task_id);
-  END IF;
+  -- create a reminder per assigned user
+  FOR v_user IN SELECT unnest(v_task.assigned_to) LOOP
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.notifications
+      WHERE user_id = v_user
+        AND type = 'task_due'
+        AND related_id = p_task_id
+        AND message = v_msg
+    ) THEN
+      PERFORM public.create_notification(v_user, v_title, v_msg, 'task_due', p_task_id);
+    END IF;
+  END LOOP;
 END;
 $$;
 
@@ -129,32 +135,56 @@ DECLARE
   v_board_name text;
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    IF NEW.assigned_to IS NOT NULL AND NEW.assigned_to <> NEW.created_by AND NEW.status <> 'done' THEN
-      PERFORM public.create_notification(
-        NEW.assigned_to,
-        'Task assigned',
-        format('You were assigned "%s".', NEW.name),
-        'task_assigned',
-        NEW.id
-      );
-    END IF;
+    -- Notify each assignee (skip creator) and schedule reminders
+    IF NEW.assigned_to IS NOT NULL AND NEW.status <> 'done' THEN
+      FOR v_user IN SELECT unnest(NEW.assigned_to) LOOP
+        IF v_user IS DISTINCT FROM NEW.created_by THEN
+          PERFORM public.create_notification(
+            v_user,
+            'Task assigned',
+            format('You were assigned "%s".', NEW.name),
+            'task_assigned',
+            NEW.id
+          );
+        END IF;
+      END LOOP;
 
-    IF NEW.assigned_to IS NOT NULL AND NEW.status <> 'done' AND NEW.due_date IS NOT NULL THEN
-      PERFORM public.send_task_due_reminder_for_task(NEW.id);
+      IF NEW.due_date IS NOT NULL THEN
+        PERFORM public.send_task_due_reminder_for_task(NEW.id);
+      END IF;
     END IF;
 
     RETURN NEW;
   END IF;
 
   IF TG_OP = 'UPDATE' THEN
-    IF NEW.assigned_to IS NOT NULL AND (OLD.assigned_to IS DISTINCT FROM NEW.assigned_to) AND NEW.assigned_to <> NEW.created_by AND NEW.status <> 'done' THEN
-      PERFORM public.create_notification(
-        NEW.assigned_to,
-        'Task assigned',
-        format('You were assigned "%s".', NEW.name),
-        'task_assigned',
-        NEW.id
-      );
+    -- Notify newly added assignees (skip creator)
+    IF NEW.assigned_to IS NOT NULL AND NEW.status <> 'done' THEN
+      IF OLD.assigned_to IS NULL THEN
+        FOR v_user IN SELECT unnest(NEW.assigned_to) LOOP
+          IF v_user IS DISTINCT FROM NEW.created_by THEN
+            PERFORM public.create_notification(
+              v_user,
+              'Task assigned',
+              format('You were assigned "%s".', NEW.name),
+              'task_assigned',
+              NEW.id
+            );
+          END IF;
+        END LOOP;
+      ELSE
+        FOR v_user IN SELECT unnest(NEW.assigned_to) LOOP
+          IF NOT (v_user = ANY(OLD.assigned_to)) AND v_user IS DISTINCT FROM NEW.created_by THEN
+            PERFORM public.create_notification(
+              v_user,
+              'Task assigned',
+              format('You were assigned "%s".', NEW.name),
+              'task_assigned',
+              NEW.id
+            );
+          END IF;
+        END LOOP;
+      END IF;
     END IF;
 
     IF NEW.status = 'done' AND OLD.status <> 'done' THEN
@@ -176,14 +206,18 @@ BEGIN
         );
       END IF;
 
-      IF NEW.assigned_to IS NOT NULL AND NEW.assigned_to <> NEW.created_by THEN
-        PERFORM public.create_notification(
-          NEW.assigned_to,
-          'Task completed',
-          format('Task "%s" in "%s" was completed.', NEW.name, COALESCE(v_board_name, 'the board')),
-          'task_completed',
-          NEW.id
-        );
+      IF NEW.assigned_to IS NOT NULL THEN
+        FOR v_user IN SELECT unnest(NEW.assigned_to) LOOP
+          IF v_user IS DISTINCT FROM NEW.created_by THEN
+            PERFORM public.create_notification(
+              v_user,
+              'Task completed',
+              format('Task "%s" in "%s" was completed.', NEW.name, COALESCE(v_board_name, 'the board')),
+              'task_completed',
+              NEW.id
+            );
+          END IF;
+        END LOOP;
       END IF;
     END IF;
 
