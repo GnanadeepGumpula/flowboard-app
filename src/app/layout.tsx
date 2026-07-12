@@ -1,10 +1,9 @@
-"use client";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AppShell } from "@/components/app-shell";
-import  DeveloperBadge  from "@/components/DeveloperBadge";
+import DeveloperBadge from "@/components/DeveloperBadge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
