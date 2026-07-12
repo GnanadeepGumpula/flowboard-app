@@ -257,14 +257,20 @@ export default function BoardPage() {
 
     setTaskLoading(true);
     const payload = {
-      board_id: boardId,
-      created_by: currentUserId,
-      name: taskName,
-      description: taskDescription,
-      status: taskStatus,
-      due_date: taskDueDate || null,
-      assigned_to: taskAssignees.length === 0 ? null : taskAssignees,
-    };
+  board_id: boardId,
+  created_by: currentUserId,
+  name: taskName,
+  description: taskDescription,
+  status: taskStatus,
+  due_date: taskDueDate || null,
+  
+  // 💡 FIX: Cast taskAssignees to bypass the 'never' type restriction
+  assigned_to: taskAssignees.length === 0 
+    ? null 
+    : (typeof (taskAssignees as any)[0] === 'object' 
+        ? (taskAssignees as any)[0].id 
+        : (taskAssignees as any)[0]),
+};
     const { data, error } = await supabase.from("tasks").insert(payload).select("id").single();
     if (error || !data) {
       console.error("Task create error", error);

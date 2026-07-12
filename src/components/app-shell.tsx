@@ -149,22 +149,26 @@ export function AppShell({ children }: AppShellProps) {
   const respondToAssignment = async (notification: any, accepted: boolean) => {
     if (!notification.related_id || !user) return;
     const taskId = notification.related_id;
+    
     const { data: taskData } = await supabase.from("tasks").select("id, name, created_by, board_id, assigned_to").eq("id", taskId).single();
     if (!taskData) return;
+    
     const { data: boardData } = await supabase.from("boards").select("name").eq("id", taskData.board_id).single();
     const boardName = boardData?.name || "a board";
-    const existingAssigned: string[] = taskData.assigned_to ?? [];
-    let newAssigned: string[] = [];
-    if (accepted) {
-      newAssigned = Array.from(new Set([...existingAssigned, user.id]));
-    } else {
-      newAssigned = existingAssigned.filter((id) => id !== user.id);
-    }
-    const { error } = await supabase.from("tasks").update({ assigned_to: newAssigned.length ? newAssigned : null }).eq("id", taskId);
+
+    // 💡 FIX: Assign a plain string instead of building a string array
+    const newAssignedValue = accepted ? user.id : null;
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({ assigned_to: newAssignedValue }) // Perfect string mapping now!
+      .eq("id", taskId);
+
     if (error) {
       toast.error("Unable to update assignment");
       return;
     }
+
     if (accepted && taskData.created_by && taskData.created_by !== user.id) {
       await supabase.rpc("create_notification", {
         p_user_id: taskData.created_by,
@@ -182,6 +186,7 @@ export function AppShell({ children }: AppShellProps) {
         p_related_id: taskId,
       });
     }
+
     await supabase.from("notifications").update({ is_read: true }).eq("id", notification.id);
     setNotifications((current) => current.filter((item) => item.id !== notification.id));
     toast.success(accepted ? "Assignment accepted" : "Assignment declined");
