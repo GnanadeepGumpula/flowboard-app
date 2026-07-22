@@ -37,6 +37,9 @@ export function AppShell({ children }: AppShellProps) {
   const [projectName, setProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [approvalNotification, setApprovalNotification] = useState<any | null>(null);
+  const [approvalRole, setApprovalRole] = useState("Update Progress");
+  const [approvalLoading, setApprovalLoading] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -144,6 +147,32 @@ export function AppShell({ children }: AppShellProps) {
       setNotifications((current) => current.filter((item) => item.id !== notification.id));
       toast.success("Invite accepted");
     }
+  };
+
+  const openBoardAccessRequest = (notification: any) => {
+    setApprovalNotification(notification);
+    const requestedRole = notification.metadata?.requested_role;
+    setApprovalRole(typeof requestedRole === "string" ? requestedRole : "Update Progress");
+  };
+
+  const approveBoardAccessRequest = async () => {
+    if (!approvalNotification?.metadata) return;
+    const { board_id, requester_id } = approvalNotification.metadata as any;
+    if (!board_id || !requester_id) return;
+
+    setApprovalLoading(true);
+    const { error } = await supabase.from("board_members").update({ status: "Accepted", role: approvalRole }).eq("board_id", board_id).eq("user_id", requester_id);
+    if (error) {
+      toast.error("Unable to approve request");
+      setApprovalLoading(false);
+      return;
+    }
+
+    await supabase.from("notifications").update({ is_read: true }).eq("id", approvalNotification.id);
+    setNotifications((current) => current.filter((item) => item.id !== approvalNotification.id));
+    setApprovalNotification(null);
+    setApprovalLoading(false);
+    toast.success("Access approved");
   };
 
   const respondToAssignment = async (notification: any, accepted: boolean) => {
@@ -307,6 +336,9 @@ export function AppShell({ children }: AppShellProps) {
                       {notification.type === "board_invite" && (
                         <Button size="sm" onClick={() => acceptInvite(notification)}>Accept invite</Button>
                       )}
+                      {notification.type === "board_access_request" && (
+                        <Button size="sm" onClick={() => openBoardAccessRequest(notification)}>Review request</Button>
+                      )}
                       {notification.type === "task_assignment_request" && (
                         <>
                           <Button size="sm" onClick={() => respondToAssignment(notification, true)}>Accept</Button>
@@ -316,7 +348,7 @@ export function AppShell({ children }: AppShellProps) {
                       {notification.type === "task_due" && (
                         <Button size="sm" variant="outline" onClick={() => dismissNotification(notification)}>Okay</Button>
                       )}
-                      {notification.type !== "task_due" && notification.type !== "board_invite" && notification.type !== "task_assignment_request" && (
+                      {notification.type !== "task_due" && notification.type !== "board_invite" && notification.type !== "task_assignment_request" && notification.type !== "board_access_request" && (
                         <Button size="sm" variant="outline" onClick={() => dismissNotification(notification)}>Okay</Button>
                       )}
                     </div>
@@ -374,6 +406,49 @@ export function AppShell({ children }: AppShellProps) {
           </aside>
           <main className="flex-1 rounded-2xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur-xl">{children}</main>
         </div>
+        <Dialog open={Boolean(approvalNotification)} onOpenChange={(open) => { if (!open) setApprovalNotification(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Approve board access</DialogTitle>
+              <DialogDescription>Review the request and confirm the member's role.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Board name</Label>
+                <Input value={approvalNotification?.metadata?.board_name || ""} disabled />
+              </div>
+              <div>
+                <Label>Project name</Label>
+                <Input value={approvalNotification?.metadata?.project_name || ""} disabled />
+              </div>
+              <div>
+                <Label>Requester email</Label>
+                <Input value={approvalNotification?.metadata?.requester_email || ""} disabled />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Input value={approvalNotification?.metadata?.board_description || ""} disabled />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <Select value={approvalRole} onValueChange={setApprovalRole}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="View Only">View Only</SelectItem>
+                    <SelectItem value="Update Progress">Update Progress</SelectItem>
+                    <SelectItem value="Add/Delete Task">Add/Delete Task</SelectItem>
+                    <SelectItem value="Editor">Editor</SelectItem>
+                    <SelectItem value="Owner">Owner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="outline" onClick={() => setApprovalNotification(null)}>Cancel</Button>
+                <Button onClick={approveBoardAccessRequest} disabled={approvalLoading}>{approvalLoading ? "Approving..." : "Accept"}</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

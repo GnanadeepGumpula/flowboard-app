@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -15,22 +16,35 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [confirmEmailOpen, setConfirmEmailOpen] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
     const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectTo,
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
     setLoading(false);
     if (error) {
       toast.error(error.message);
       return;
     }
-    if (data.user) {
-      await supabase.from("profiles").insert({ id: data.user.id, email, full_name: fullName });
+    if (data.session) {
+      toast.success("Account created and signed in.");
+      router.push("/dashboard");
+      return;
     }
-    toast.success("Account created. Check your inbox if confirmation is needed.");
-    router.push("/dashboard");
+    setConfirmEmailOpen(true);
+    toast.success("Account created. Check your inbox to confirm your email.");
   };
 
   return (
@@ -60,6 +74,20 @@ export default function SignupPage() {
           Already have an account? <Link className="font-medium text-indigo-600" href="/login">Sign in</Link>
         </p>
       </div>
+
+      <Dialog open={confirmEmailOpen} onOpenChange={setConfirmEmailOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirm your email</DialogTitle>
+            <DialogDescription>
+              We sent a verification link to {email || "your inbox"}. Open that email to finish creating your account, then you will be signed in automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <Button type="button" className="w-full" onClick={() => setConfirmEmailOpen(false)}>
+            Close
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

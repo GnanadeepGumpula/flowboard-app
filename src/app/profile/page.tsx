@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, CheckCircle2, LayoutGrid, Sparkles, UserCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -39,46 +39,87 @@ export default function ProfilePage() {
   const [createdBoards, setCreatedBoards] = useState<BoardSummary[]>([]);
   const [acceptedBoards, setAcceptedBoards] = useState<BoardSummary[]>([]);
   const [completedTasks, setCompletedTasks] = useState<CompletedTask[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) {
-        router.replace("/login");
-        return;
-      }
+  // 1. Extracted loadProfile for silent background refreshing
+  const loadProfile = useCallback(async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh) setLoading(true);
 
-      const [{ data: profileData }, { data: createdBoardsData }, { data: acceptedMemberships }, { data: completedTasksData }] = await Promise.all([
-        supabase.from("profiles").select("id, email, full_name, avatar_url").eq("id", userId).single(),
-        supabase.from("boards").select("id, name, description").eq("created_by", userId).order("name"),
-        supabase.from("board_members").select("board_id").eq("user_id", userId).eq("status", "Accepted"),
-        supabase.from("tasks").select("id, name, board_id").contains("assigned_to", [userId]).eq("status", "done"),
-      ]);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    setCurrentUserId(userId ?? null);
 
-      const boardIds = (acceptedMemberships ?? []).map((entry: any) => entry.board_id).filter(Boolean);
-      const { data: acceptedBoardsData } = boardIds.length > 0
-        ? await supabase.from("boards").select("id, name, description").in("id", boardIds).order("name")
-        : { data: [] };
+    if (!userId) {
+      if (!isBackgroundRefresh) router.replace("/login");
+      return;
+    }
 
-      const boardNameMap = new Map((acceptedBoardsData ?? []).map((board: any) => [board.id, board.name]));
-      const taskRows = (completedTasksData ?? []).map((task: any) => ({
-        id: task.id,
-        name: task.name,
-        board_name: boardNameMap.get(task.board_id) ?? null,
-      }));
+    const [{ data: profileData }, { data: createdBoardsData }, { data: acceptedMemberships }, { data: completedTasksData }] = await Promise.all([
+      supabase.from("profiles").select("id, email, full_name, avatar_url").eq("id", userId).single(),
+      supabase.from("boards").select("id, name, description").eq("created_by", userId).order("name"),
+      supabase.from("board_members").select("board_id").eq("user_id", userId).eq("status", "Accepted"),
+      supabase.from("tasks").select("id, name, board_id").contains("assigned_to", [userId]).eq("status", "done"),
+    ]);
 
-      setProfile(profileData as ProfileData | null);
+    const boardIds = (acceptedMemberships ?? []).map((entry: any) => entry.board_id).filter(Boolean);
+    const { data: acceptedBoardsData } = boardIds.length > 0
+      ? await supabase.from("boards").select("id, name, description").in("id", boardIds).order("name")
+      : { data: [] };
+
+    const boardNameMap = new Map((acceptedBoardsData ?? []).map((board: any) => [board.id, board.name]));
+    const taskRows = (completedTasksData ?? []).map((task: any) => ({
+      id: task.id,
+      name: task.name,
+      board_name: boardNameMap.get(task.board_id) ?? null,
+    }));
+
+    setProfile(profileData as ProfileData | null);
+    
+    // Only update the input fields on the initial load so we don't overwrite user typing
+    if (!isBackgroundRefresh) {
       setFullName(profileData?.full_name ?? "");
       setAvatarUrl(profileData?.avatar_url ?? "");
-      setCreatedBoards((createdBoardsData ?? []) as BoardSummary[]);
-      setAcceptedBoards((acceptedBoardsData ?? []) as BoardSummary[]);
-      setCompletedTasks(taskRows);
-      setLoading(false);
-    };
-
-    loadProfile();
+    }
+    
+    setCreatedBoards((createdBoardsData ?? []) as BoardSummary[]);
+    setAcceptedBoards((acceptedBoardsData ?? []) as BoardSummary[]);
+    setCompletedTasks(taskRows);
+    setLoading(false);
   }, [router, supabase]);
+
+  // 2. Initial Load
+  useEffect(() => {
+    loadProfile(false);
+  }, [loadProfile]);
+
+  // 3. Real-time Subscription for Profile updates
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`realtime:profile_${currentUserId}`)
+      // Listen for profile changes (e.g. updated on another device)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${currentUserId}` }, () => {
+        loadProfile(true);
+      })
+      // Listen for board changes (e.g. board renamed)
+      .on("postgres_changes", { event: "*", schema: "public", table: "boards" }, () => {
+        loadProfile(true);
+      })
+      // Listen for membership changes (e.g. accepted a new invite)
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_members", filter: `user_id=eq.${currentUserId}` }, () => {
+        loadProfile(true);
+      })
+      // Listen for task changes (e.g. completed a new task)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        loadProfile(true);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, loadProfile, supabase]);
 
   const handleSave = async () => {
     if (!profile) return;
@@ -89,6 +130,7 @@ export default function ProfilePage() {
     } else {
       toast.success("Profile updated");
       setProfile((current) => current ? { ...current, full_name: fullName || null, avatar_url: avatarUrl || null } : current);
+      loadProfile(true); // Sync across active sessions
     }
     setSaving(false);
   };

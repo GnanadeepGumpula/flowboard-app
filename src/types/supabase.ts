@@ -74,21 +74,21 @@ export type Database = {
           id: string;
           board_id: string;
           user_id: string;
-          role: "View Only" | "Update Progress" | "Add/Delete Task" | "Owner";
+          role: "View Only" | "Update Progress" | "Add/Delete Task" | "Editor" | "Owner";
           status: "Pending" | "Accepted";
         };
         Insert: {
           id?: string;
           board_id: string;
           user_id: string;
-          role: "View Only" | "Update Progress" | "Add/Delete Task" | "Owner";
+          role: "View Only" | "Update Progress" | "Add/Delete Task" | "Editor" | "Owner";
           status?: "Pending" | "Accepted";
         };
         Update: {
           id?: string;
           board_id?: string;
           user_id?: string;
-          role?: "View Only" | "Update Progress" | "Add/Delete Task" | "Owner";
+          role?: "View Only" | "Update Progress" | "Add/Delete Task" | "Editor" | "Owner";
           status?: "Pending" | "Accepted";
         };
         Relationships: [];
@@ -134,6 +134,7 @@ export type Database = {
           message: string;
           type: string;
           related_id: string | null;
+          metadata: Json;
           is_read: boolean;
         };
         Insert: {
@@ -143,6 +144,7 @@ export type Database = {
           message: string;
           type: string;
           related_id?: string | null;
+          metadata?: Json;
           is_read?: boolean;
         };
         Update: {
@@ -152,6 +154,7 @@ export type Database = {
           message?: string;
           type?: string;
           related_id?: string | null;
+          metadata?: Json;
           is_read?: boolean;
         };
         Relationships: [];

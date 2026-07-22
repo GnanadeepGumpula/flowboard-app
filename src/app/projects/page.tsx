@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { FolderKanban, PlusCircle, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -26,12 +26,23 @@ export default function ProjectsPage() {
   const [editingName, setEditingName] = useState("");
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const loadProjects = async () => {
+  // 1. Updated loadProjects for silent background refresh
+  const loadProjects = useCallback(async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh) setLoading(true);
+    
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return;
+    setCurrentUserId(userId ?? null);
+    
+    if (!userId) {
+      if (!isBackgroundRefresh) setLoading(false);
+      return;
+    }
+    
     const { data, error } = await supabase.from("projects").select("id, name, description").eq("created_by", userId).order("name");
+    
     if (!error) {
       const expanded = await Promise.all((data ?? []).map(async (project) => {
         const { data: boards } = await supabase.from("boards").select("id, name").eq("project_id", project.id).order("name");
@@ -40,18 +51,38 @@ export default function ProjectsPage() {
       setProjects(expanded);
     }
     setLoading(false);
-  };
-
-  useEffect(() => {
-    loadProjects();
   }, [supabase]);
 
+  // 2. Initial load
+  useEffect(() => {
+    loadProjects(false);
+  }, [loadProjects]);
+
+  // 3. Real-time Subscription for Projects & Boards
+  useEffect(() => {
+    if (!currentUserId) return;
+    
+    const channel = supabase
+      .channel(`realtime:projects_${currentUserId}`)
+      // Listen for changes to this user's projects (renamed, created, deleted)
+      .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter: `created_by=eq.${currentUserId}` }, () => {
+        loadProjects(true);
+      })
+      // Listen for changes to boards (in case a board is added/removed from a project)
+      .on("postgres_changes", { event: "*", schema: "public", table: "boards" }, () => {
+        loadProjects(true);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, loadProjects, supabase]);
+
   const handleCreate = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId || !name.trim()) return;
+    if (!currentUserId || !name.trim()) return;
     setCreating(true);
-    const { error } = await supabase.from("projects").insert({ name, description: "", created_by: userId });
+    const { error } = await supabase.from("projects").insert({ name, description: "", created_by: currentUserId });
     setCreating(false);
     if (error) {
       toast.error("Unable to create project");
@@ -59,7 +90,7 @@ export default function ProjectsPage() {
     }
     toast.success("Project created");
     setName("");
-    loadProjects();
+    loadProjects(true); // Silent refresh
   };
 
   const handleDelete = async (projectId: string) => {
@@ -69,7 +100,7 @@ export default function ProjectsPage() {
       return;
     }
     toast.success("Project deleted");
-    loadProjects();
+    loadProjects(true); // Silent refresh
   };
 
   const handleEdit = async (projectId: string) => {
@@ -84,7 +115,7 @@ export default function ProjectsPage() {
     toast.success("Project updated");
     setEditingProjectId(null);
     setEditingName("");
-    loadProjects();
+    loadProjects(true); // Silent refresh
   };
 
   return (

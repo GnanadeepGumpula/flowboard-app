@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { Share2, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -9,41 +9,70 @@ export default function SharedSpacesPage() {
   const supabase = useMemo(() => createClient(), []);
   const [boards, setBoards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadBoards = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
+  // 1. Extracted loadBoards for silent background refreshing
+  const loadBoards = useCallback(async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh) setLoading(true);
 
-      const { data: memberships } = await supabase
-        .from("board_members")
-        .select("board_id")
-        .eq("user_id", userId)
-        .eq("status", "Accepted");
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    setCurrentUserId(userId ?? null);
 
-      const boardIds = (memberships ?? []).map((entry: any) => entry.board_id).filter(Boolean);
-      if (boardIds.length === 0) {
-        setBoards([]);
-        setLoading(false);
-        return;
-      }
+    if (!userId) {
+      if (!isBackgroundRefresh) setLoading(false);
+      return;
+    }
 
-      const { data } = await supabase
-        .from("boards")
-        .select("id, name, description, created_by")
-        .in("id", boardIds)
-        .neq("created_by", userId)
-        .order("name");
+    const { data: memberships } = await supabase
+      .from("board_members")
+      .select("board_id")
+      .eq("user_id", userId)
+      .eq("status", "Accepted");
 
-      setBoards(data ?? []);
+    const boardIds = (memberships ?? []).map((entry: any) => entry.board_id).filter(Boolean);
+    if (boardIds.length === 0) {
+      setBoards([]);
       setLoading(false);
-    };
-    loadBoards();
+      return;
+    }
+
+    const { data } = await supabase
+      .from("boards")
+      .select("id, name, description, created_by")
+      .in("id", boardIds)
+      .neq("created_by", userId)
+      .order("name");
+
+    setBoards(data ?? []);
+    setLoading(false);
   }, [supabase]);
+
+  // 2. Initial Load
+  useEffect(() => {
+    loadBoards(false);
+  }, [loadBoards]);
+
+  // 3. Real-time Subscription for Shared Boards
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`realtime:shared_${currentUserId}`)
+      // Listen for membership changes (e.g., getting added/removed from a board, or accepting an invite)
+      .on("postgres_changes", { event: "*", schema: "public", table: "board_members", filter: `user_id=eq.${currentUserId}` }, () => {
+        loadBoards(true);
+      })
+      // Listen for board detail changes (e.g., if a shared board is renamed or deleted by the owner)
+      .on("postgres_changes", { event: "*", schema: "public", table: "boards" }, () => {
+        loadBoards(true);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, loadBoards, supabase]);
 
   return (
     <div className="space-y-6">
@@ -59,7 +88,7 @@ export default function SharedSpacesPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {boards.map((board) => (
-            <Link key={board.id} href={`/boards/${board.id}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:-translate-y-1 hover:shadow-md">
+            <Link key={board.id} href={`/boards/${board.id}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
               <div className="flex items-center gap-3">
                 <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600"><Share2 className="h-5 w-5" /></div>
                 <div>

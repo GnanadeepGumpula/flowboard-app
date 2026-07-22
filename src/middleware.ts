@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const protectedPaths = ["/dashboard", "/projects", "/boards", "/shared", "/settings"];
-const publicPaths = ["/login", "/signup"];
+const publicPaths = ["/login", "/signup", "/auth/callback"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -32,11 +32,14 @@ export async function middleware(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
 
   if (!data.user && isProtectedPath) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(loginUrl);
   }
 
   if (data.user && isPublicPath) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    const nextPath = request.nextUrl.searchParams.get("next");
+    return NextResponse.redirect(new URL(nextPath || "/dashboard", request.url));
   }
 
   return response;
