@@ -579,32 +579,33 @@ export default function BoardPage() {
               )}
 
               {/* 3-dots actions menu */}
+              {/* 3-dots actions menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-11 w-11 rounded-[14px] bg-white border-slate-200 text-slate-700 shadow-sm hover:bg-slate-50 transition-colors shrink-0">
+                  <Button variant="outline" size="sm" className="h-11 w-11 rounded-[14px] bg-white border-slate-200 text-slate-700 shadow-sm hover:bg-slate-50 transition-colors shrink-0 outline-none">
                     <MoreHorizontal className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 rounded-[16px] p-2 shadow-xl border-slate-100 mt-1 z-50 bg-white/95 backdrop-blur-xl">
                   {canManageBoard(currentUserRole) && (
                     <>
-                      <DropdownMenuItem className="rounded-[10px] font-bold cursor-pointer p-3 hover:bg-slate-50" onClick={() => setEditingBoard(true)}>
+                      <DropdownMenuItem className="rounded-[10px] font-bold text-slate-700 cursor-pointer p-3 hover:bg-slate-50 hover:text-slate-900 outline-none" onClick={() => setEditingBoard(true)}>
                         <Pencil className="w-4 h-4 mr-2.5 text-slate-500" /> Edit Board
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="rounded-[10px] font-bold cursor-pointer p-3 hover:bg-slate-50" onClick={copyShareLink}>
+                      <DropdownMenuItem className="rounded-[10px] font-bold text-slate-700 cursor-pointer p-3 hover:bg-slate-50 hover:text-slate-900 outline-none" onClick={copyShareLink}>
                         <Share2 className="w-4 h-4 mr-2.5 text-slate-500" /> Share Link
                       </DropdownMenuItem>
                     </>
                   )}
                   {canManageTasks(currentUserRole) && (
-                    <DropdownMenuItem className="rounded-[10px] font-bold cursor-pointer p-3 hover:bg-slate-50" onClick={() => setInviteModalOpen(true)}>
+                    <DropdownMenuItem className="rounded-[10px] font-bold text-slate-700 cursor-pointer p-3 hover:bg-slate-50 hover:text-slate-900 outline-none" onClick={() => setInviteModalOpen(true)}>
                       <Users className="w-4 h-4 mr-2.5 text-slate-500" /> Invite / Members
                     </DropdownMenuItem>
                   )}
                   {isCurrentUserOwnerOnly && (
                     <>
                       <div className="h-px bg-slate-100 my-1 mx-2" />
-                      <DropdownMenuItem className="rounded-[10px] font-bold cursor-pointer p-3 text-rose-600 focus:text-rose-600 focus:bg-rose-50" onClick={async () => { const { error } = await supabase.from("boards").delete().eq("id", boardId); if (error) { toast.error("Unable to delete board"); return; } toast.success("Board deleted"); router.push("/dashboard"); }}>
+                      <DropdownMenuItem className="rounded-[10px] font-bold cursor-pointer p-3 text-rose-600 focus:text-rose-600 focus:bg-rose-50 outline-none" onClick={async () => { const { error } = await supabase.from("boards").delete().eq("id", boardId); if (error) { toast.error("Unable to delete board"); return; } toast.success("Board deleted"); router.push("/dashboard"); }}>
                         <Trash2 className="w-4 h-4 mr-2.5" /> Delete Board
                       </DropdownMenuItem>
                     </>

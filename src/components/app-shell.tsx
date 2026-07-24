@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
   Bell, Plus, LogOut, Sparkles, UserCircle2, 
-  Grip, Search, Globe, Smartphone, Layers, Folder, Users,
+  Search, Globe, Smartphone, Layers, Folder, Users,
   Grid3X3, User, Menu, X
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -25,6 +25,21 @@ interface ProjectOption {
   id: string;
   name: string;
 }
+
+// Custom 9-Dot Logo matching the UI design
+const BrandLogo = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <circle cx="5" cy="5" r="2.5" />
+    <circle cx="12" cy="5" r="2.5" />
+    <circle cx="19" cy="5" r="2.5" />
+    <circle cx="5" cy="12" r="2.5" />
+    <circle cx="12" cy="12" r="2.5" />
+    <circle cx="19" cy="12" r="2.5" />
+    <circle cx="5" cy="19" r="2.5" />
+    <circle cx="12" cy="19" r="2.5" />
+    <circle cx="19" cy="19" r="2.5" />
+  </svg>
+);
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
@@ -271,46 +286,51 @@ export function AppShell({ children }: AppShellProps) {
   // Reusable Create Dropdown (Used in both Desktop Sidebar and Mobile Nav)
   const renderCreateDropdown = () => (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <div className="relative group flex items-center justify-center outline-none flex-1 lg:flex-none w-full">
-          <button className="w-12 h-12 lg:w-10 lg:h-10 flex items-center justify-center rounded-[16px] lg:rounded-[12px] bg-slate-900 text-white lg:bg-slate-100 lg:text-slate-600 hover:bg-slate-800 lg:hover:bg-slate-200 lg:hover:text-slate-900 transition-colors shadow-md lg:shadow-none">
+      <div className="relative group flex items-center justify-center outline-none flex-1 lg:flex-none w-full">
+        <DropdownMenuTrigger asChild>
+          <button className="w-12 h-12 lg:w-10 lg:h-10 flex items-center justify-center rounded-[16px] lg:rounded-[14px] bg-[#8B5CF6] hover:bg-[#7C3AED] text-white transition-colors shadow-md outline-none">
             <Plus className="w-[24px] h-[24px] lg:w-[22px] lg:h-[22px]" />
           </button>
-          <div className="absolute lg:left-[110%] bottom-full mb-3 lg:mb-0 lg:bottom-auto lg:ml-3 px-3 py-1.5 bg-slate-800 text-white text-[12px] font-bold rounded-lg opacity-0 pointer-events-none lg:group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
-            Create New
-          </div>
+        </DropdownMenuTrigger>
+        
+        {/* Hover Tooltip */}
+        <div className="absolute lg:left-[110%] bottom-full mb-3 lg:mb-0 lg:bottom-auto lg:ml-3 px-3 py-1.5 bg-slate-800 text-white text-[12px] font-bold rounded-lg opacity-0 pointer-events-none lg:group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
+          Create New
         </div>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="center" sideOffset={16} className="w-56 rounded-[20px] p-2 shadow-xl border-slate-100 z-50">
+      </div>
+
+      <DropdownMenuContent align="center" sideOffset={16} className="w-56 rounded-[20px] p-2 shadow-xl border-slate-100 z-50 bg-white">
+        
+        {/* New Board Modal */}
         <Dialog>
           <DialogTrigger asChild>
-            <DropdownMenuItem className="rounded-xl font-bold cursor-pointer p-3 hover:bg-slate-50 outline-none" onSelect={(e) => e.preventDefault()}>
+            <DropdownMenuItem className="rounded-xl font-bold text-slate-700 cursor-pointer p-3 hover:bg-slate-50 hover:text-slate-900 outline-none" onSelect={(e) => e.preventDefault()}>
               New board
             </DropdownMenuItem>
           </DialogTrigger>
-          <DialogContent className="rounded-[24px] border-slate-100 shadow-2xl p-6 sm:max-w-[425px]">
+          <DialogContent className="rounded-[24px] border-slate-100 shadow-2xl p-6 sm:max-w-[425px] bg-white">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold">Create a board</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-slate-900">Create a board</DialogTitle>
               <DialogDescription className="font-medium text-slate-500">Start a fresh workflow or connect it to a project.</DialogDescription>
             </DialogHeader>
             <div className="space-y-5 mt-4">
               <div>
                 <Label className="font-bold text-slate-700">Board Name</Label>
-                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors font-medium" value={boardName} onChange={(e) => setBoardName(e.target.value)} placeholder="e.g. Sprint planning" />
+                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 text-slate-900 h-11 px-4 focus:bg-white transition-colors font-medium" value={boardName} onChange={(e) => setBoardName(e.target.value)} placeholder="e.g. Sprint planning" />
               </div>
               <div>
                 <Label className="font-bold text-slate-700">Description</Label>
-                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors font-medium" value={boardDescription} onChange={(e) => setBoardDescription(e.target.value)} placeholder="What is this board for?" />
+                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 text-slate-900 h-11 px-4 focus:bg-white transition-colors font-medium" value={boardDescription} onChange={(e) => setBoardDescription(e.target.value)} placeholder="What is this board for?" />
               </div>
               <div>
                 <Label className="font-bold text-slate-700">Project Connection</Label>
                 <Select onValueChange={setSelectedProjectId} value={selectedProjectId}>
-                  <SelectTrigger className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors font-medium">
+                  <SelectTrigger className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 text-slate-900 h-11 px-4 focus:bg-white transition-colors font-medium">
                     <SelectValue placeholder="No project connection" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-100 shadow-xl">
-                    <SelectItem value="none" className="font-medium">No project connection</SelectItem>
-                    {projects.map((project) => <SelectItem key={project.id} value={project.id} className="font-medium">{project.name}</SelectItem>)}
+                  <SelectContent className="rounded-xl border-slate-100 shadow-xl bg-white">
+                    <SelectItem value="none" className="font-medium text-slate-700">No project connection</SelectItem>
+                    {projects.map((project) => <SelectItem key={project.id} value={project.id} className="font-medium text-slate-700">{project.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -323,21 +343,22 @@ export function AppShell({ children }: AppShellProps) {
           </DialogContent>
         </Dialog>
         
+        {/* New Project Modal */}
         <Dialog>
           <DialogTrigger asChild>
-            <DropdownMenuItem className="rounded-xl font-bold cursor-pointer p-3 hover:bg-slate-50 outline-none" onSelect={(e) => e.preventDefault()}>
+            <DropdownMenuItem className="rounded-xl font-bold text-slate-700 cursor-pointer p-3 hover:bg-slate-50 hover:text-slate-900 outline-none" onSelect={(e) => e.preventDefault()}>
               New project
             </DropdownMenuItem>
           </DialogTrigger>
-          <DialogContent className="rounded-[24px] border-slate-100 shadow-2xl p-6 sm:max-w-[425px]">
+          <DialogContent className="rounded-[24px] border-slate-100 shadow-2xl p-6 sm:max-w-[425px] bg-white">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold">Create a project</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-slate-900">Create a project</DialogTitle>
               <DialogDescription className="font-medium text-slate-500">Group boards under a shared initiative.</DialogDescription>
             </DialogHeader>
             <div className="space-y-5 mt-4">
               <div>
                 <Label className="font-bold text-slate-700">Project name</Label>
-                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors font-medium" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Launch 2026" />
+                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 text-slate-900 h-11 px-4 focus:bg-white transition-colors font-medium" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Launch 2026" />
               </div>
               <div className="pt-2">
                 <Button className="w-full h-12 rounded-[14px] bg-[#8B5CF6] text-white font-bold text-[15px] hover:bg-[#7C3AED] transition-colors" onClick={handleProjectCreate} disabled={creatingProject}>
@@ -347,6 +368,7 @@ export function AppShell({ children }: AppShellProps) {
             </div>
           </DialogContent>
         </Dialog>
+
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -362,7 +384,7 @@ export function AppShell({ children }: AppShellProps) {
           <div className="space-y-6 flex flex-col items-center w-full">
             {/* Logo */}
             <div className="w-10 h-10 flex items-center justify-center text-[#8B5CF6] mb-2">
-              <Grip className="w-[28px] h-[28px]" />
+              <BrandLogo className="w-[28px] h-[28px]" />
             </div>
             
             {/* Nav Links */}
@@ -382,7 +404,7 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Mobile Floating Bottom Nav */}
         <aside 
-          className="lg:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white/95 backdrop-blur-xl border-t border-slate-200/60 flex items-center justify-around px-2 z-50 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]"
+          className="lg:hidden fixed bottom-0 left-0 right-0 h-[80px] bg-white/95 backdrop-blur-xl border-t border-slate-200/60 flex items-center justify-around px-2 z-50 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <NavIcon icon={Grid3X3} label="Boards" href="/dashboard" active={pathname === "/dashboard" || pathname.startsWith("/boards")} />
@@ -398,16 +420,18 @@ export function AppShell({ children }: AppShellProps) {
         {/* Right Content Area (Header + Main) */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative bg-[#F9F9FB]">
           
-          {/* Top Header - Restored */}
-          <header className="h-[70px] lg:h-[80px] bg-white border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 relative z-20">
+          {/* Top Header */}
+          <header className="h-[70px] lg:h-[80px] bg-white border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 relative z-20 lg:rounded-t-2xl">
              
              {/* Mobile Logo */}
              <div className="flex items-center gap-2 text-slate-900 font-extrabold text-[20px] tracking-tight lg:hidden">
-               <Grip className="w-[24px] h-[24px]" /> Flowboard
+               <BrandLogo className="w-[24px] h-[24px] text-[#8B5CF6]" /> FlowBoard
              </div>
 
-             {/* Desktop Search Placeholder (to balance layout) */}
-             <div className="hidden lg:flex flex-1"></div>
+             {/* Desktop Logo */}
+             <div className="hidden lg:flex items-center gap-2.5 text-slate-900 font-[800] text-[24px] tracking-tight">
+               <BrandLogo className="w-[26px] h-[26px] text-[#8B5CF6]" /> FlowBoard
+             </div>
              
              {/* Right Header Actions */}
              <div className="flex items-center gap-3 sm:gap-5">
@@ -493,7 +517,7 @@ export function AppShell({ children }: AppShellProps) {
              </div>
           </header>
 
-          {/* Main Content Area */}
+          {/* Main Content Area - Scroll bounded to strictly this container */}
           <main className="flex-1 overflow-y-auto pb-[80px] lg:pb-0 relative bg-[#F9F9FB] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {children}
           </main>
