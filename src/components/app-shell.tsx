@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, LayoutGrid, Plus, FolderKanban, Share2, LogOut, Sparkles, PanelsTopLeft, Menu, X, UserCircle2 } from "lucide-react";
+import { 
+  Bell, Plus, LogOut, Sparkles, UserCircle2, 
+  Grip, Search, Globe, Smartphone, Layers, Folder, Users,
+  Grid3X3, User, Menu, X
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -27,16 +31,19 @@ export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const isAuthRoute = pathname === "/login" || pathname === "/signup";
+  
   const [user, setUser] = useState<any>(null);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  
+  // Board & Project Creation State
   const [boardName, setBoardName] = useState("");
   const [boardDescription, setBoardDescription] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [creatingBoard, setCreatingBoard] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [creatingProject, setCreatingProject] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
   const [approvalNotification, setApprovalNotification] = useState<any | null>(null);
   const [approvalRole, setApprovalRole] = useState("Update Progress");
   const [approvalLoading, setApprovalLoading] = useState(false);
@@ -63,10 +70,6 @@ export function AppShell({ children }: AppShellProps) {
     };
     loadProjects();
   }, [user, supabase]);
-
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     if (!user) return;
@@ -99,19 +102,24 @@ export function AppShell({ children }: AppShellProps) {
       created_by: user.id,
       project_id: selectedProjectId || null,
     }).select("id").single();
+    
     if (error || !data) {
       toast.error("Unable to create board");
       setCreatingBoard(false);
       return;
     }
+    
     await supabase.from("board_members").insert({
       board_id: data.id,
       user_id: user.id,
       role: "Owner",
       status: "Accepted",
     });
+    
     toast.success("Board created");
     setCreatingBoard(false);
+    setBoardName("");
+    setBoardDescription("");
     router.push(`/boards/${data.id}`);
   };
 
@@ -123,11 +131,13 @@ export function AppShell({ children }: AppShellProps) {
       description: "",
       created_by: user.id,
     });
+    
     if (error) {
       toast.error("Unable to create project");
       setCreatingProject(false);
       return;
     }
+    
     toast.success("Project created");
     setCreatingProject(false);
     setProjectName("");
@@ -185,12 +195,11 @@ export function AppShell({ children }: AppShellProps) {
     const { data: boardData } = await supabase.from("boards").select("name").eq("id", taskData.board_id).single();
     const boardName = boardData?.name || "a board";
 
-    // 💡 FIX: Assign a plain string instead of building a string array
     const newAssignedValue = accepted ? user.id : null;
 
     const { error } = await supabase
       .from("tasks")
-      .update({ assigned_to: newAssignedValue }) // Perfect string mapping now!
+      .update({ assigned_to: newAssignedValue })
       .eq("id", taskId);
 
     if (error) {
@@ -230,225 +239,312 @@ export function AppShell({ children }: AppShellProps) {
     setNotifications((current) => current.filter((item) => item.id !== notification.id));
   };
 
-  const navItems = [
-    { href: "/dashboard", label: "Recent Boards", icon: LayoutGrid },
-    { href: "/projects", label: "Projects", icon: FolderKanban },
-    { href: "/shared", label: "Shared Spaces", icon: Share2 },
-    { href: "/profile", label: "Profile", icon: UserCircle2 },
-  ];
-
   if (isAuthRoute) {
     return <>{children}</>;
   }
 
-  return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(120,119,198,0.2),_transparent_30%),linear-gradient(135deg,_#f8fafc,_#eef2ff)] text-slate-800">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 lg:px-6">
-        <header className="mb-4 flex items-center justify-between rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm backdrop-blur-xl">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="rounded-xl bg-slate-900 p-2 text-white"><PanelsTopLeft className="h-5 w-5" /></div>
-            <div>
-              <p className="text-lg font-semibold">Flowboard</p>
-              <p className="text-xs text-slate-500">Real-time project planning</p>
-            </div>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" className="h-10 w-10 p-0 lg:hidden" onClick={() => setMobileMenuOpen((value) => !value)} aria-label="Toggle navigation">
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> New
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <DropdownMenuItem>New board</DropdownMenuItem>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create a board</DialogTitle>
-                      <DialogDescription>Start a fresh workflow or connect it to a project.</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Name</Label>
-                        <Input value={boardName} onChange={(e) => setBoardName(e.target.value)} placeholder="Sprint planning" />
-                      </div>
-                      <div>
-                        <Label>Description</Label>
-                        <Input value={boardDescription} onChange={(e) => setBoardDescription(e.target.value)} placeholder="What is this board for?" />
-                      </div>
-                      <div>
-                        <Label>Project</Label>
-                        <Select onValueChange={setSelectedProjectId} value={selectedProjectId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="No project connection" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">No project connection</SelectItem>
-                            {projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button onClick={handleBoardCreate} disabled={creatingBoard}>Create board</Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <DropdownMenuItem>New project</DropdownMenuItem>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create a project</DialogTitle>
-                      <DialogDescription>Group boards under a shared initiative.</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Project name</Label>
-                        <Input value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Launch 2026" />
-                      </div>
-                      <Button onClick={handleProjectCreate} disabled={creatingProject}>Create project</Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
-                  <Bell className="h-5 w-5" />
-                  {notifications.length > 0 && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-rose-500" />}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
-                {notifications.length === 0 ? <div className="p-3 text-sm text-slate-500">No notifications yet.</div> : notifications.map((notification) => (
-                  <div key={notification.id} className="rounded-lg border border-slate-100 p-3">
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">{notification.title}</p>
-                      {notification.type === "board_invite" ? <Sparkles className="h-4 w-4 text-indigo-500" /> : <Bell className="h-4 w-4 text-slate-400" />}
-                    </div>
-                    <p className="mb-2 text-sm text-slate-500">{notification.message}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {notification.type === "board_invite" && (
-                        <Button size="sm" onClick={() => acceptInvite(notification)}>Accept invite</Button>
-                      )}
-                      {notification.type === "board_access_request" && (
-                        <Button size="sm" onClick={() => openBoardAccessRequest(notification)}>Review request</Button>
-                      )}
-                      {notification.type === "task_assignment_request" && (
-                        <>
-                          <Button size="sm" onClick={() => respondToAssignment(notification, true)}>Accept</Button>
-                          <Button size="sm" variant="outline" onClick={() => respondToAssignment(notification, false)}>Decline</Button>
-                        </>
-                      )}
-                      {notification.type === "task_due" && (
-                        <Button size="sm" variant="outline" onClick={() => dismissNotification(notification)}>Okay</Button>
-                      )}
-                      {notification.type !== "task_due" && notification.type !== "board_invite" && notification.type !== "task_assignment_request" && notification.type !== "board_access_request" && (
-                        <Button size="sm" variant="outline" onClick={() => dismissNotification(notification)}>Okay</Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="rounded-full px-2">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">{user?.email?.[0]?.toUpperCase() ?? "U"}</div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => router.push("/profile")}>Profile</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSignOut} className="text-rose-600">
-                  <LogOut className="mr-2 h-4 w-4" /> Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
-        {mobileMenuOpen && (
-          <div className="mb-4 rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm backdrop-blur-xl lg:hidden">
-            <nav className="space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                return (
-                  <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)} className={active ? "flex items-center gap-3 rounded-xl bg-indigo-50 px-3 py-3 text-sm font-medium text-indigo-700" : "flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-600 hover:bg-slate-100"}>
-                    <Icon className="h-4 w-4" /> {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        )}
-        <div className="flex flex-1 gap-4">
-          <aside className="hidden w-72 rounded-2xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur-xl lg:block">
-            <div className="mb-4 flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-white">
-              <Sparkles className="h-4 w-4" />
-              <span className="text-sm font-medium">Workspace</span>
-            </div>
-            <nav className="space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                return (
-                  <Link key={item.href} href={item.href} className={active ? "flex items-center gap-3 rounded-xl bg-indigo-50 px-3 py-3 text-sm font-medium text-indigo-700" : "flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-600 hover:bg-slate-100"}>
-                    <Icon className="h-4 w-4" /> {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </aside>
-          <main className="flex-1 rounded-2xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur-xl">{children}</main>
+  const avatarLetter = user?.email?.[0]?.toUpperCase() ?? "U";
+
+  // Reusable Nav Icon Component for Sidebar and Mobile Bottom Nav
+  const NavIcon = ({ icon: Icon, label, href, active }: any) => {
+    const content = (
+      <div className={`flex items-center justify-center transition-all duration-200 cursor-pointer 
+        w-12 h-12 rounded-[16px] lg:w-11 lg:h-11 lg:rounded-[14px]
+        ${active 
+          ? "bg-[#8B5CF6] text-white shadow-md scale-105 lg:scale-100" 
+          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+      }`}>
+        <Icon className={active ? "w-[22px] h-[22px] lg:w-[20px] lg:h-[20px]" : "w-[24px] h-[24px] lg:w-[22px] lg:h-[22px] stroke-[1.5px]"} />
+      </div>
+    );
+
+    return (
+      <div className="relative group flex items-center justify-center flex-1 lg:flex-none w-full">
+        {href ? <Link href={href} className="w-full flex justify-center outline-none">{content}</Link> : content}
+        <div className="absolute lg:left-[110%] bottom-full mb-3 lg:mb-0 lg:bottom-auto lg:ml-2 px-3 py-1.5 bg-slate-800 text-white text-[12px] font-bold rounded-lg opacity-0 pointer-events-none lg:group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
+          {label}
         </div>
-        <Dialog open={Boolean(approvalNotification)} onOpenChange={(open) => { if (!open) setApprovalNotification(null); }}>
-          <DialogContent>
+      </div>
+    );
+  };
+
+  // Reusable Create Dropdown (Used in both Desktop Sidebar and Mobile Nav)
+  const renderCreateDropdown = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <div className="relative group flex items-center justify-center outline-none flex-1 lg:flex-none w-full">
+          <button className="w-12 h-12 lg:w-10 lg:h-10 flex items-center justify-center rounded-[16px] lg:rounded-[12px] bg-slate-900 text-white lg:bg-slate-100 lg:text-slate-600 hover:bg-slate-800 lg:hover:bg-slate-200 lg:hover:text-slate-900 transition-colors shadow-md lg:shadow-none">
+            <Plus className="w-[24px] h-[24px] lg:w-[22px] lg:h-[22px]" />
+          </button>
+          <div className="absolute lg:left-[110%] bottom-full mb-3 lg:mb-0 lg:bottom-auto lg:ml-3 px-3 py-1.5 bg-slate-800 text-white text-[12px] font-bold rounded-lg opacity-0 pointer-events-none lg:group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 shadow-xl">
+            Create New
+          </div>
+        </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center" sideOffset={16} className="w-56 rounded-[20px] p-2 shadow-xl border-slate-100 z-50">
+        <Dialog>
+          <DialogTrigger asChild>
+            <DropdownMenuItem className="rounded-xl font-bold cursor-pointer p-3 hover:bg-slate-50 outline-none" onSelect={(e) => e.preventDefault()}>
+              New board
+            </DropdownMenuItem>
+          </DialogTrigger>
+          <DialogContent className="rounded-[24px] border-slate-100 shadow-2xl p-6 sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Approve board access</DialogTitle>
-              <DialogDescription>Review the request and confirm the member's role.</DialogDescription>
+              <DialogTitle className="text-xl font-bold">Create a board</DialogTitle>
+              <DialogDescription className="font-medium text-slate-500">Start a fresh workflow or connect it to a project.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-5 mt-4">
               <div>
-                <Label>Board name</Label>
-                <Input value={approvalNotification?.metadata?.board_name || ""} disabled />
+                <Label className="font-bold text-slate-700">Board Name</Label>
+                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors font-medium" value={boardName} onChange={(e) => setBoardName(e.target.value)} placeholder="e.g. Sprint planning" />
               </div>
               <div>
-                <Label>Project name</Label>
-                <Input value={approvalNotification?.metadata?.project_name || ""} disabled />
+                <Label className="font-bold text-slate-700">Description</Label>
+                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors font-medium" value={boardDescription} onChange={(e) => setBoardDescription(e.target.value)} placeholder="What is this board for?" />
               </div>
               <div>
-                <Label>Requester email</Label>
-                <Input value={approvalNotification?.metadata?.requester_email || ""} disabled />
-              </div>
-              <div>
-                <Label>Description</Label>
-                <Input value={approvalNotification?.metadata?.board_description || ""} disabled />
-              </div>
-              <div>
-                <Label>Role</Label>
-                <Select value={approvalRole} onValueChange={setApprovalRole}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="View Only">View Only</SelectItem>
-                    <SelectItem value="Update Progress">Update Progress</SelectItem>
-                    <SelectItem value="Add/Delete Task">Add/Delete Task</SelectItem>
-                    <SelectItem value="Editor">Editor</SelectItem>
-                    <SelectItem value="Owner">Owner</SelectItem>
+                <Label className="font-bold text-slate-700">Project Connection</Label>
+                <Select onValueChange={setSelectedProjectId} value={selectedProjectId}>
+                  <SelectTrigger className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors font-medium">
+                    <SelectValue placeholder="No project connection" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+                    <SelectItem value="none" className="font-medium">No project connection</SelectItem>
+                    {projects.map((project) => <SelectItem key={project.id} value={project.id} className="font-medium">{project.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-end gap-2">
-                <Button variant="outline" onClick={() => setApprovalNotification(null)}>Cancel</Button>
-                <Button onClick={approveBoardAccessRequest} disabled={approvalLoading}>{approvalLoading ? "Approving..." : "Accept"}</Button>
+              <div className="pt-2">
+                <Button className="w-full h-12 rounded-[14px] bg-[#8B5CF6] text-white font-bold text-[15px] hover:bg-[#7C3AED] transition-colors" onClick={handleBoardCreate} disabled={creatingBoard}>
+                  {creatingBoard ? "Creating..." : "Create board"}
+                </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
+        
+        <Dialog>
+          <DialogTrigger asChild>
+            <DropdownMenuItem className="rounded-xl font-bold cursor-pointer p-3 hover:bg-slate-50 outline-none" onSelect={(e) => e.preventDefault()}>
+              New project
+            </DropdownMenuItem>
+          </DialogTrigger>
+          <DialogContent className="rounded-[24px] border-slate-100 shadow-2xl p-6 sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Create a project</DialogTitle>
+              <DialogDescription className="font-medium text-slate-500">Group boards under a shared initiative.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-5 mt-4">
+              <div>
+                <Label className="font-bold text-slate-700">Project name</Label>
+                <Input className="mt-1.5 rounded-[12px] bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors font-medium" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Launch 2026" />
+              </div>
+              <div className="pt-2">
+                <Button className="w-full h-12 rounded-[14px] bg-[#8B5CF6] text-white font-bold text-[15px] hover:bg-[#7C3AED] transition-colors" onClick={handleProjectCreate} disabled={creatingProject}>
+                  {creatingProject ? "Creating..." : "Create project"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  return (
+    <div className="flex flex-col h-[100dvh] w-full bg-[#F4F4F5] lg:p-4 xl:p-6 font-sans antialiased text-slate-900 overflow-hidden">
+      
+      {/* App Container */}
+      <div className="flex flex-1 w-full max-w-[1600px] mx-auto bg-[#F9F9FB] lg:rounded-[24px] lg:border border-slate-200/60 lg:shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden relative">
+        
+        {/* Desktop Sidebar (Left) */}
+        <aside className="hidden lg:flex w-[80px] bg-white border-r border-slate-100 flex-col items-center py-6 justify-between shrink-0 z-30">
+          <div className="space-y-6 flex flex-col items-center w-full">
+            {/* Logo */}
+            <div className="w-10 h-10 flex items-center justify-center text-[#8B5CF6] mb-2">
+              <Grip className="w-[28px] h-[28px]" />
+            </div>
+            
+            {/* Nav Links */}
+            <div className="space-y-3 flex flex-col items-center w-full px-2">
+              <NavIcon icon={Grid3X3} label="Recent boards" href="/dashboard" active={pathname === "/dashboard" || pathname.startsWith("/boards")} />
+              <NavIcon icon={Folder} label="Projects" href="/projects" active={pathname.startsWith("/projects")} />
+              <NavIcon icon={Users} label="Shared Spaces" href="/shared" active={pathname.startsWith("/shared")} />
+              <NavIcon icon={User} label="Profile" href="/profile" active={pathname.startsWith("/profile")} />
+            </div>
+          </div>
+
+          {/* Create Button Desktop */}
+          <div className="pb-2">
+            {renderCreateDropdown()}
+          </div>
+        </aside>
+
+        {/* Mobile Floating Bottom Nav */}
+        <aside 
+          className="lg:hidden fixed bottom-0 left-0 right-0 h-[72px] bg-white/95 backdrop-blur-xl border-t border-slate-200/60 flex items-center justify-around px-2 z-50 shadow-[0_-8px_30px_rgba(0,0,0,0.06)]"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <NavIcon icon={Grid3X3} label="Boards" href="/dashboard" active={pathname === "/dashboard" || pathname.startsWith("/boards")} />
+          <NavIcon icon={Folder} label="Projects" href="/projects" active={pathname.startsWith("/projects")} />
+          
+          {/* Create Button Mobile */}
+          {renderCreateDropdown()}
+          
+          <NavIcon icon={Users} label="Shared" href="/shared" active={pathname.startsWith("/shared")} />
+          <NavIcon icon={User} label="Profile" href="/profile" active={pathname.startsWith("/profile")} />
+        </aside>
+
+        {/* Right Content Area (Header + Main) */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative bg-[#F9F9FB]">
+          
+          {/* Top Header - Restored */}
+          <header className="h-[70px] lg:h-[80px] bg-white border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 relative z-20">
+             
+             {/* Mobile Logo */}
+             <div className="flex items-center gap-2 text-slate-900 font-extrabold text-[20px] tracking-tight lg:hidden">
+               <Grip className="w-[24px] h-[24px]" /> Flowboard
+             </div>
+
+             {/* Desktop Search Placeholder (to balance layout) */}
+             <div className="hidden lg:flex flex-1"></div>
+             
+             {/* Right Header Actions */}
+             <div className="flex items-center gap-3 sm:gap-5">
+               
+               {/* Search Bar */}
+               <div className="hidden sm:flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-[12px] px-3 h-10 w-48 lg:w-64 transition-all hover:border-slate-300 shadow-sm cursor-text">
+                 <div className="flex items-center gap-2">
+                   <Search className="w-[18px] h-[18px] text-slate-400 shrink-0" />
+                   <span className="font-medium text-[14px] text-slate-400">Search</span>
+                 </div>
+                 <kbd className="font-sans font-bold text-slate-400 text-[11px] bg-slate-100 px-1.5 py-0.5 rounded-[6px]">⌘K</kbd>
+               </div>
+
+               {/* Notifications Popover */}
+               <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="relative w-10 h-10 rounded-full p-0 flex items-center justify-center hover:bg-slate-100 transition-colors outline-none">
+                      <Bell className="w-[22px] h-[22px] text-slate-700" />
+                      {notifications.length > 0 && <span className="absolute right-[8px] top-[8px] h-[9px] w-[9px] rounded-full bg-[#EA4335] ring-2 ring-white" />}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[340px] rounded-[24px] p-3 shadow-2xl border-slate-100 mt-2 z-50">
+                    <div className="px-3 pb-3 pt-1 flex items-center justify-between border-b border-slate-100 mb-2">
+                      <span className="font-bold text-[15px] text-slate-900">Notifications</span>
+                      {notifications.length > 0 && <span className="bg-indigo-50 text-indigo-600 text-xs font-bold px-2 py-0.5 rounded-full">{notifications.length} new</span>}
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto pr-1">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-[14px] text-center font-semibold text-slate-400">All caught up!</div>
+                      ) : notifications.map((notification) => (
+                        <div key={notification.id} className="rounded-2xl p-4 mb-2 bg-slate-50/80 hover:bg-slate-50 transition-colors border border-slate-100/50">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-[14px] font-bold text-slate-900 leading-tight">{notification.title}</p>
+                            {notification.type === "board_invite" ? <Sparkles className="w-4 h-4 text-[#8B5CF6] shrink-0" /> : <Bell className="w-4 h-4 text-slate-400 shrink-0" />}
+                          </div>
+                          <p className="mb-4 text-[13px] font-medium text-slate-500 leading-snug">{notification.message}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {notification.type === "board_invite" && (
+                              <Button size="sm" className="rounded-[10px] h-8 font-bold bg-[#8B5CF6] hover:bg-[#7C3AED] text-white" onClick={() => acceptInvite(notification)}>Accept invite</Button>
+                            )}
+                            {notification.type === "board_access_request" && (
+                              <Button size="sm" className="rounded-[10px] h-8 font-bold bg-slate-900 text-white" onClick={() => openBoardAccessRequest(notification)}>Review request</Button>
+                            )}
+                            {notification.type === "task_assignment_request" && (
+                              <>
+                                <Button size="sm" className="rounded-[10px] h-8 font-bold bg-slate-900 text-white" onClick={() => respondToAssignment(notification, true)}>Accept</Button>
+                                <Button size="sm" variant="outline" className="rounded-[10px] h-8 font-bold" onClick={() => respondToAssignment(notification, false)}>Decline</Button>
+                              </>
+                            )}
+                            {notification.type === "task_due" && (
+                              <Button size="sm" variant="outline" className="rounded-[10px] h-8 font-bold" onClick={() => dismissNotification(notification)}>Dismiss</Button>
+                            )}
+                            {notification.type !== "task_due" && notification.type !== "board_invite" && notification.type !== "task_assignment_request" && notification.type !== "board_access_request" && (
+                              <Button size="sm" variant="outline" className="rounded-[10px] h-8 font-bold" onClick={() => dismissNotification(notification)}>Got it</Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </DropdownMenuContent>
+               </DropdownMenu>
+
+               {/* User Avatar */}
+               <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="rounded-full p-0 w-[38px] h-[38px] ml-1 overflow-hidden transition-transform active:scale-95 outline-none ring-2 ring-transparent hover:ring-slate-200">
+                      <div className="flex w-full h-full items-center justify-center bg-[#DDCBB5] text-[15px] font-bold text-slate-800">
+                        {avatarLetter}
+                      </div>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="rounded-[20px] p-2 shadow-xl border-slate-100 w-48 mt-2 z-50">
+                    <DropdownMenuItem onClick={() => router.push("/profile")} className="rounded-[12px] font-semibold cursor-pointer p-3 hover:bg-slate-50">
+                      <UserCircle2 className="mr-2.5 h-4 w-4 text-slate-500" /> Profile
+                    </DropdownMenuItem>
+                    <div className="h-px bg-slate-100 my-1 mx-2"></div>
+                    <DropdownMenuItem onClick={handleSignOut} className="rounded-[12px] font-semibold cursor-pointer p-3 text-[#EA4335] focus:text-[#EA4335] focus:bg-rose-50">
+                      <LogOut className="mr-2.5 h-4 w-4" /> Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+               </DropdownMenu>
+
+             </div>
+          </header>
+
+          {/* Main Content Area */}
+          <main className="flex-1 overflow-y-auto pb-[80px] lg:pb-0 relative bg-[#F9F9FB] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {children}
+          </main>
+
+        </div>
+
+        {/* Approval Modal */}
+        <Dialog open={Boolean(approvalNotification)} onOpenChange={(open) => { if (!open) setApprovalNotification(null); }}>
+          <DialogContent className="rounded-[24px] p-6 border-slate-100 shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Approve board access</DialogTitle>
+              <DialogDescription className="font-medium text-slate-500">Review the request and confirm the member's role.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <div>
+                <Label className="font-semibold text-slate-700">Board name</Label>
+                <Input className="mt-1.5 rounded-xl bg-slate-50 border-slate-200 h-11" value={approvalNotification?.metadata?.board_name || ""} disabled />
+              </div>
+              <div>
+                <Label className="font-semibold text-slate-700">Project name</Label>
+                <Input className="mt-1.5 rounded-xl bg-slate-50 border-slate-200 h-11" value={approvalNotification?.metadata?.project_name || ""} disabled />
+              </div>
+              <div>
+                <Label className="font-semibold text-slate-700">Requester email</Label>
+                <Input className="mt-1.5 rounded-xl bg-slate-50 border-slate-200 h-11" value={approvalNotification?.metadata?.requester_email || ""} disabled />
+              </div>
+              <div>
+                <Label className="font-semibold text-slate-700">Description</Label>
+                <Input className="mt-1.5 rounded-xl bg-slate-50 border-slate-200 h-11" value={approvalNotification?.metadata?.board_description || ""} disabled />
+              </div>
+              <div>
+                <Label className="font-semibold text-slate-700">Role</Label>
+                <Select value={approvalRole} onValueChange={setApprovalRole}>
+                  <SelectTrigger className="mt-1.5 rounded-xl bg-white border-slate-200 h-11"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl shadow-lg border-slate-100">
+                    <SelectItem value="View Only" className="font-medium">View Only</SelectItem>
+                    <SelectItem value="Update Progress" className="font-medium">Update Progress</SelectItem>
+                    <SelectItem value="Add/Delete Task" className="font-medium">Add/Delete Task</SelectItem>
+                    <SelectItem value="Editor" className="font-medium">Editor</SelectItem>
+                    <SelectItem value="Owner" className="font-medium">Owner</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-end gap-3 mt-4">
+                <Button variant="outline" className="rounded-xl h-11 font-bold" onClick={() => setApprovalNotification(null)}>Cancel</Button>
+                <Button className="rounded-xl h-11 bg-slate-900 font-bold" onClick={approveBoardAccessRequest} disabled={approvalLoading}>{approvalLoading ? "Approving..." : "Accept"}</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </div>
   );

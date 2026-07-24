@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { FolderKanban, PlusCircle, Pencil, Trash2 } from "lucide-react";
+import { FolderKanban, PlusCircle, Pencil, Trash2, Globe, Smartphone, Layers, Folder, Search, Filter, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,6 +16,19 @@ interface ProjectRecord {
   description: string | null;
   boards: Array<{ id: string; name: string }>;
 }
+
+// Helper to match visual styling of cards
+const getGradientStyle = (index: number) => {
+  const gradients = [
+    "linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%)", // Purple/Blue
+    "linear-gradient(135deg, #3B82F6 0%, #2DD4BF 100%)", // Blue/Teal
+    "linear-gradient(135deg, #8B5CF6 0%, #D946EF 100%)", // Purple/Pink
+    "linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)", // Orange/Red
+    "linear-gradient(135deg, #10B981 0%, #3B82F6 100%)", // Green/Blue
+    "linear-gradient(135deg, #EC4899 0%, #F43F5E 100%)"  // Pink/Rose
+  ];
+  return gradients[index % gradients.length];
+};
 
 export default function ProjectsPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -64,11 +77,9 @@ export default function ProjectsPage() {
     
     const channel = supabase
       .channel(`realtime:projects_${currentUserId}`)
-      // Listen for changes to this user's projects (renamed, created, deleted)
       .on("postgres_changes", { event: "*", schema: "public", table: "projects", filter: `created_by=eq.${currentUserId}` }, () => {
         loadProjects(true);
       })
-      // Listen for changes to boards (in case a board is added/removed from a project)
       .on("postgres_changes", { event: "*", schema: "public", table: "boards" }, () => {
         loadProjects(true);
       })
@@ -118,63 +129,120 @@ export default function ProjectsPage() {
     loadProjects(true); // Silent refresh
   };
 
+  if (loading) return <div className="py-20 flex justify-center items-center h-full"><div className="animate-pulse flex flex-col items-center"><div className="h-10 w-10 border-4 border-[#8B5CF6] border-t-transparent rounded-full animate-spin"></div><p className="mt-4 text-slate-500 font-medium">Loading projects...</p></div></div>;
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 pt-4 max-w-[1200px] mx-auto">
+      
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-500">Projects</p>
-          <h1 className="mt-2 text-3xl font-semibold">Organize work by initiative</h1>
+          <h1 className="text-[32px] font-extrabold text-slate-900 tracking-tight">Projects</h1>
+          <p className="mt-1 text-[15px] font-medium text-slate-500">Organize work by initiative</p>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button><PlusCircle className="mr-2 h-4 w-4" /> New project</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create a project</DialogTitle>
-              <DialogDescription>Group related boards under one workspace.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Project name</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Quarterly launch" />
-              </div>
-              <Button onClick={handleCreate} disabled={creating}>Create project</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-      {loading ? <div className="text-sm text-slate-500">Loading projects...</div> : projects.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-sm text-slate-500">No projects yet. Create one to start grouping boards.</div> : <div className="grid gap-4 md:grid-cols-2">
-        {projects.map((project) => (
-          <div key={project.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600"><FolderKanban className="h-5 w-5" /></div>
+        <div className="flex items-center gap-3">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="rounded-xl h-10 px-4 font-bold bg-slate-900 text-white shadow-md hover:scale-105 transition-transform">
+                <PlusCircle className="mr-2 h-4 w-4" /> New project
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-[24px] border-slate-100 shadow-2xl p-6 sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">Create a project</DialogTitle>
+                <DialogDescription className="font-medium text-slate-500">Group related boards under one workspace.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-5 mt-4">
                 <div>
-                  <p className="font-semibold">{project.name}</p>
-                  <p className="text-sm text-slate-500">{project.boards.length} board(s)</p>
+                  <Label className="font-semibold text-slate-700">Project name</Label>
+                  <Input className="mt-1.5 rounded-xl bg-slate-50 border-slate-200 h-11 px-4 focus:bg-white transition-colors" value={name} onChange={(e) => setName(e.target.value)} placeholder="Quarterly launch" />
+                </div>
+                <div className="pt-2">
+                  <Button className="w-full h-12 rounded-xl bg-slate-900 text-white font-bold text-[15px] hover:bg-slate-800 transition-colors" onClick={handleCreate} disabled={creating}>
+                    {creating ? "Creating..." : "Create project"}
+                  </Button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => { setEditingProjectId(project.id); setEditingName(project.name); }} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"><Pencil className="h-4 w-4" /></button>
-                <button onClick={() => handleDelete(project.id)} className="rounded-lg border border-rose-200 p-2 text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button>
-              </div>
-            </div>
-            {editingProjectId === project.id && (
-              <div className="mt-4 space-y-2">
-                <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => handleEdit(project.id)} disabled={saving}>Save</Button>
-                  <Button size="sm" variant="outline" onClick={() => { setEditingProjectId(null); setEditingName(""); }}>Cancel</Button>
-                </div>
-              </div>
-            )}
-            <div className="mt-4 space-y-2">
-              {project.boards.length === 0 ? <p className="text-sm text-slate-500">No boards linked yet.</p> : project.boards.map((board) => <Link key={board.id} href={`/boards/${board.id}`} className="block rounded-xl border border-slate-100 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">{board.name}</Link>)}
-            </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {projects.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-[32px] border-2 border-dashed border-slate-200 bg-white/50 px-8 py-24 text-center">
+          <div className="mb-5 rounded-[16px] bg-[#8B5CF6] p-4 text-white shadow-xl shadow-[#8B5CF6]/20">
+            <FolderKanban className="h-8 w-8" />
           </div>
-        ))}
-      </div>}
+          <h2 className="text-[22px] font-extrabold text-slate-900">No projects yet</h2>
+          <p className="mt-2 max-w-sm text-[15px] font-medium text-slate-500">Create one to start grouping boards.</p>
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {projects.map((project, index) => {
+            const ProjectIcon = [Globe, Smartphone, Layers][index % 3] || Folder;
+            return (
+              <div key={project.id} className="group relative rounded-[24px] bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] overflow-hidden flex flex-col h-[280px]">
+                
+                {/* Colorful Top Gradient Area */}
+                <div 
+                  className="h-[100px] w-full p-5 relative" 
+                  style={{ background: getGradientStyle(index) }}
+                >
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-[2px]"></div>
+                  {/* Category Tag */}
+                  <div className="relative z-10 inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md rounded-lg px-3 py-1.5 text-[12px] font-bold text-slate-800 shadow-sm">
+                    <ProjectIcon className="w-3.5 h-3.5 text-slate-600" />
+                    {project.name}
+                  </div>
+                  <div className="absolute top-5 right-5 z-10 flex gap-2">
+                    <button onClick={() => { setEditingProjectId(project.id); setEditingName(project.name); }} className="w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-slate-600 transition-colors shadow-sm backdrop-blur-md"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => handleDelete(project.id)} className="w-8 h-8 rounded-full bg-white/80 hover:bg-rose-50 flex items-center justify-center text-rose-500 transition-colors shadow-sm backdrop-blur-md"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+
+                {/* Card Content Area */}
+                <div className="p-5 flex flex-col flex-1 relative -mt-4 bg-white rounded-t-[20px]">
+                  
+                  {editingProjectId === project.id ? (
+                    <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
+                      <Input className="h-10 rounded-lg bg-white" value={editingName} onChange={(e) => setEditingName(e.target.value)} />
+                      <div className="flex gap-2">
+                        <Button size="sm" className="rounded-lg font-bold bg-slate-900" onClick={() => handleEdit(project.id)} disabled={saving}>Save</Button>
+                        <Button size="sm" variant="outline" className="rounded-lg font-bold" onClick={() => { setEditingProjectId(null); setEditingName(""); }}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="text-[20px] font-bold text-slate-900 leading-tight mb-2 truncate">{project.name}</h3>
+                      <p className="text-[14px] font-medium text-slate-500 mb-4">
+                        {project.boards.length} board(s)
+                      </p>
+                    </>
+                  )}
+
+                  {/* Boards List */}
+                  <div className="mt-auto space-y-2 overflow-y-auto max-h-[100px] pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {project.boards.length === 0 ? (
+                      <p className="text-[13px] font-medium text-slate-400 italic">No boards linked yet.</p>
+                    ) : (
+                      project.boards.map((board) => (
+                        <Link 
+                          key={board.id} 
+                          href={`/boards/${board.id}`} 
+                          className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5 hover:bg-slate-100 hover:border-slate-200 transition-colors group/board"
+                        >
+                          <span className="text-[13px] font-bold text-slate-700 truncate mr-2">{board.name}</span>
+                          <span className="text-slate-400 group-hover/board:text-slate-600 font-bold">›</span>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

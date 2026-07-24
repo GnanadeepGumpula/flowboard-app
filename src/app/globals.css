@@ -1,26 +1,37 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Soft, airy background matching the Kanban board UI */
+  --background: #FAF9FC;
+  /* Crisp dark slate for better readability */
+  --foreground: #0f172a; 
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f172a;
+    --foreground: #f8fafc;
   }
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  
+  /* Adds the subtle, playful pastel gradient blobs seen in the background of your design */
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(255, 223, 212, 0.4) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(198, 240, 228, 0.4) 0%, transparent 40%),
+    radial-gradient(circle at 70% 10%, rgba(229, 212, 255, 0.4) 0%, transparent 40%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  min-height: 100vh;
 }

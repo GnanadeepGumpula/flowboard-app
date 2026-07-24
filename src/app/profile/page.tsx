@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Camera, CheckCircle2, LayoutGrid, Sparkles, UserCircle2 } from "lucide-react";
+import Link from "next/link";
+import { FolderKanban, CheckCircle2, UserCircle2, Sparkles, LayoutGrid, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,6 @@ interface CompletedTask {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +49,9 @@ export default function ProfilePage() {
     setCurrentUserId(userId ?? null);
 
     if (!userId) {
-      if (!isBackgroundRefresh) router.replace("/login");
+      if (!isBackgroundRefresh) {
+        window.location.href = "/login";
+      }
       return;
     }
 
@@ -85,7 +86,7 @@ export default function ProfilePage() {
     setAcceptedBoards((acceptedBoardsData ?? []) as BoardSummary[]);
     setCompletedTasks(taskRows);
     setLoading(false);
-  }, [router, supabase]);
+  }, [supabase]);
 
   // 2. Initial Load
   useEffect(() => {
@@ -98,19 +99,15 @@ export default function ProfilePage() {
 
     const channel = supabase
       .channel(`realtime:profile_${currentUserId}`)
-      // Listen for profile changes (e.g. updated on another device)
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${currentUserId}` }, () => {
         loadProfile(true);
       })
-      // Listen for board changes (e.g. board renamed)
       .on("postgres_changes", { event: "*", schema: "public", table: "boards" }, () => {
         loadProfile(true);
       })
-      // Listen for membership changes (e.g. accepted a new invite)
       .on("postgres_changes", { event: "*", schema: "public", table: "board_members", filter: `user_id=eq.${currentUserId}` }, () => {
         loadProfile(true);
       })
-      // Listen for task changes (e.g. completed a new task)
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
         loadProfile(true);
       })
@@ -136,72 +133,159 @@ export default function ProfilePage() {
   };
 
   if (loading) {
-    return <div className="py-20 text-center text-slate-500">Loading profile...</div>;
+    return (
+      <div className="py-20 flex justify-center items-center h-full">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-10 w-10 border-4 border-[#8B5CF6] border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-slate-500 font-medium">Loading profile...</p>
+        </div>
+      </div>
+    );
   }
 
+  const avatarLetter = (profile?.full_name || profile?.email || "U").charAt(0).toUpperCase();
+
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-500">Profile</p>
-        <h1 className="mt-2 text-3xl font-semibold">Your account and activity</h1>
+    <div className="space-y-8 pt-4 max-w-[1200px] mx-auto pb-10">
+      
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-[32px] font-extrabold text-slate-900 tracking-tight">Profile</h1>
+          <p className="mt-1 text-[15px] font-medium text-slate-500">Your account and activity details</p>
+        </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-900 text-xl font-semibold text-white">
-              {profile?.avatar_url ? <img src={profile.avatar_url} alt="Avatar" className="h-16 w-16 rounded-full object-cover" /> : <UserCircle2 className="h-8 w-8" />}
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        
+        {/* Left Column: Profile Editor */}
+        <div className="rounded-[24px] border border-slate-100 bg-white p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] h-max">
+          <div className="flex items-center gap-5 mb-8">
+            <div className="flex h-[80px] w-[80px] items-center justify-center rounded-full bg-[#E5D4FF] text-[32px] font-bold text-[#8B5CF6] shadow-sm border-4 border-white ring-1 ring-slate-100 overflow-hidden">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                avatarLetter
+              )}
             </div>
             <div>
-              <p className="text-xl font-semibold">{profile?.full_name || profile?.email || "Your profile"}</p>
-              <p className="text-sm text-slate-500">{profile?.email}</p>
+              <p className="text-[22px] font-extrabold text-slate-900 leading-tight">{profile?.full_name || "Anonymous User"}</p>
+              <p className="text-[14px] font-medium text-slate-500 mt-1">{profile?.email}</p>
             </div>
           </div>
 
-          <div className="mt-6 space-y-4">
+          <div className="space-y-5">
             <div>
-              <Label>Full name</Label>
-              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" />
+              <Label className="font-bold text-slate-700 text-[13px]">Full name</Label>
+              <Input 
+                className="mt-1.5 h-12 rounded-[12px] bg-slate-50 border-slate-200 focus:bg-white transition-colors px-4 font-medium" 
+                value={fullName} 
+                onChange={(e) => setFullName(e.target.value)} 
+                placeholder="Your name" 
+              />
             </div>
             <div>
-              <Label>Avatar URL</Label>
-              <Input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://..." />
+              <Label className="font-bold text-slate-700 text-[13px]">Avatar URL</Label>
+              <Input 
+                className="mt-1.5 h-12 rounded-[12px] bg-slate-50 border-slate-200 focus:bg-white transition-colors px-4 font-medium" 
+                value={avatarUrl} 
+                onChange={(e) => setAvatarUrl(e.target.value)} 
+                placeholder="https://..." 
+              />
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-medium text-slate-900">Password</p>
-              <p className="mt-1">Password changes are handled securely through Supabase authentication.</p>
+            <div className="rounded-[16px] border border-slate-100 bg-slate-50 p-4 shadow-sm mt-4">
+              <p className="font-bold text-[14px] text-slate-900">Password & Security</p>
+              <p className="mt-1.5 text-[13px] font-medium text-slate-500 leading-relaxed">
+                Password changes and primary email updates are handled securely through your Supabase authentication provider.
+              </p>
             </div>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save profile"}</Button>
+            <div className="pt-3">
+              <Button 
+                onClick={handleSave} 
+                disabled={saving}
+                className="w-full h-12 rounded-[12px] bg-slate-900 hover:bg-slate-800 text-white font-bold text-[15px] transition-colors"
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
           </div>
         </div>
 
+        {/* Right Column: Activity & History */}
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-indigo-500" />
-              <h2 className="text-lg font-semibold">Board history</h2>
-            </div>
-            <div className="mt-4 space-y-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Created by you</p>
-                {createdBoards.length === 0 ? <p className="mt-1 text-sm text-slate-500">No boards created yet.</p> : createdBoards.map((board) => <div key={board.id} className="mt-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">{board.name}</div>)}
+          
+          {/* Board History Card */}
+          <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-[12px] bg-[#F1EBFF] text-[#8B5CF6] flex items-center justify-center">
+                <LayoutGrid className="h-5 w-5" />
               </div>
+              <h2 className="text-[18px] font-extrabold text-slate-900">Board history</h2>
+            </div>
+            
+            <div className="space-y-5">
               <div>
-                <p className="text-sm font-semibold text-slate-700">Accepted shared boards</p>
-                {acceptedBoards.length === 0 ? <p className="mt-1 text-sm text-slate-500">No accepted shared boards yet.</p> : acceptedBoards.map((board) => <div key={board.id} className="mt-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">{board.name}</div>)}
+                <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3 px-1">Created by you</p>
+                <div className="space-y-2">
+                  {createdBoards.length === 0 ? (
+                    <p className="text-[13px] font-medium text-slate-400 italic px-1">No boards created yet.</p>
+                  ) : (
+                    createdBoards.map((board) => (
+                      <Link key={board.id} href={`/boards/${board.id}`} className="flex items-center justify-between rounded-[14px] border border-slate-100 bg-slate-50/50 px-4 py-3 hover:bg-slate-50 transition-colors group">
+                        <span className="text-[14px] font-bold text-slate-700 truncate">{board.name}</span>
+                        <span className="text-slate-300 font-bold group-hover:text-slate-500">›</span>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3 px-1">Shared with you</p>
+                <div className="space-y-2">
+                  {acceptedBoards.length === 0 ? (
+                    <p className="text-[13px] font-medium text-slate-400 italic px-1">No accepted shared boards yet.</p>
+                  ) : (
+                    acceptedBoards.map((board) => (
+                      <Link key={board.id} href={`/boards/${board.id}`} className="flex items-center justify-between rounded-[14px] border border-slate-100 bg-[#E6F8F3]/30 px-4 py-3 hover:bg-[#E6F8F3]/60 transition-colors group">
+                        <div className="flex items-center gap-2 truncate">
+                          <Users className="w-3.5 h-3.5 text-[#10B981] shrink-0" />
+                          <span className="text-[14px] font-bold text-slate-700 truncate">{board.name}</span>
+                        </div>
+                        <span className="text-slate-300 font-bold group-hover:text-[#10B981]">›</span>
+                      </Link>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-              <h2 className="text-lg font-semibold">Completed tasks</h2>
+          {/* Completed Tasks Card */}
+          <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-[12px] bg-[#D1FAE5] text-[#10B981] flex items-center justify-center">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <h2 className="text-[18px] font-extrabold text-slate-900">Completed tasks</h2>
             </div>
-            <div className="mt-4 space-y-2">
-              {completedTasks.length === 0 ? <p className="text-sm text-slate-500">No completed tasks yet.</p> : completedTasks.map((task) => <div key={task.id} className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">{task.name}{task.board_name ? ` · ${task.board_name}` : ""}</div>)}
+            
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {completedTasks.length === 0 ? (
+                <p className="text-[13px] font-medium text-slate-400 italic px-1">No completed tasks yet. Keep going!</p>
+              ) : (
+                completedTasks.map((task) => (
+                  <div key={task.id} className="flex flex-col justify-center rounded-[14px] border border-slate-100 bg-slate-50/50 px-4 py-3">
+                    <span className="text-[14px] font-bold text-slate-700 truncate line-through decoration-slate-300">{task.name}</span>
+                    {task.board_name && (
+                      <span className="text-[11px] font-semibold text-slate-400 mt-0.5 truncate">{task.board_name}</span>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
+
         </div>
       </div>
     </div>
