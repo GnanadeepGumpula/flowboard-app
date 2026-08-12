@@ -9,12 +9,19 @@ import { toast } from "sonner";
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Form State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  // Forgot Password Modal State
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetStep, setResetStep] = useState<"initial" | "otp">("initial");
+  const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
+  const [modalLoading, setModalLoading] = useState(false);
 
   // Parallax State for Right Side
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -43,6 +50,108 @@ function LoginContent() {
     toast.success("Signed in successfully");
     const nextPath = searchParams.get("next");
     router.push(nextPath || "/dashboard");
+  };
+
+  // 1. Send OTP Code
+  const handleSendOtp = async () => {
+    if (!resetEmail) {
+      toast.error("Please enter your email address");
+      return;
+    }
+    setModalLoading(true);
+    const supabase = createClient();
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: resetEmail,
+      options: { shouldCreateUser: false },
+    });
+
+    setModalLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("OTP sent to your email!");
+    setResetStep("otp");
+  };
+
+  // 2. Send Direct Reset Link
+  const handleSendResetLink = async () => {
+  if (!resetEmail) {
+    toast.error("Please enter your email address");
+    return;
+  }
+  setModalLoading(true);
+  const supabase = createClient();
+
+  // Triggers the 'Reset password' template in Supabase
+  const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+
+  setModalLoading(false);
+
+  if (error) {
+    toast.error(error.message);
+    return;
+  }
+
+  toast.success("Reset link sent! Please check your inbox.");
+  closeModal();
+};
+
+  // 3. Verify OTP & Auto Login
+  const handleVerifyOtp = async () => {
+    const token = otp.join("");
+    if (token.length < 6) {
+      toast.error("Please enter all 6 digits");
+      return;
+    }
+    setModalLoading(true);
+    const supabase = createClient();
+
+    const { error } = await supabase.auth.verifyOtp({
+      email: resetEmail,
+      token,
+      type: "email",
+    });
+
+    setModalLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success("Signed in successfully!");
+    closeModal();
+    router.push("/dashboard");
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) value = value.slice(-1);
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    if (value && index < 5) {
+      document.getElementById(`otp-${index + 1}`)?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      document.getElementById(`otp-${index - 1}`)?.focus();
+    }
+  };
+
+  const closeModal = () => {
+    setIsForgotModalOpen(false);
+    setResetStep("initial");
+    setOtp(Array(6).fill(""));
+    setResetEmail("");
   };
 
   return (
@@ -148,9 +257,14 @@ function LoginContent() {
                   <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="hidden" />
                   <span className="text-[13.5px] font-medium text-[#2a2a30]">Remember me</span>
                 </label>
-                <Link href="#" className="text-[13.5px] font-semibold text-black underline underline-offset-[3px] decoration-[1.5px] hover:opacity-70 transition-opacity">
+                
+                <button 
+                  type="button" 
+                  onClick={() => setIsForgotModalOpen(true)}
+                  className="text-[13.5px] font-semibold text-black underline underline-offset-[3px] decoration-[1.5px] hover:opacity-70 transition-opacity"
+                >
                   Forgot password?
-                </Link>
+                </button>
               </div>
 
               <button type="submit" disabled={loading} className="w-full h-[56px] rounded-full bg-black text-white text-[17px] font-semibold tracking-[-0.01em] hover:bg-[#111] active:scale-[0.99] transition-all shadow-[0_8px_24px_rgba(0,0,0,0.16)] mt-1 flex items-center justify-center">
@@ -380,6 +494,102 @@ function LoginContent() {
       
       {/* Mobile-only gradient overlay for seamless look */}
       <div className="absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t from-[#b8a9e8]/40 to-transparent pointer-events-none lg:hidden"></div>
+
+      {/* --- FORGOT PASSWORD MODAL POPUP --- */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-[420px] bg-white rounded-[24px] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-[#eeeeef] relative animate-in fade-in zoom-in-95 duration-200">
+            <button 
+              onClick={closeModal}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#f6f6f7] flex items-center justify-center text-[#6b6b76] hover:text-black hover:bg-[#eaeaec] transition-all"
+            >
+              ✕
+            </button>
+
+            {resetStep === "initial" ? (
+              <div>
+                <h3 className="text-[24px] font-[800] tracking-[-0.02em] text-black mb-1">Reset Password</h3>
+                <p className="text-[14px] text-[#6b6b76] mb-6">Enter your email to receive an OTP code or a direct reset link.</p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[13px] font-semibold text-black mb-1.5 block">Email Address</label>
+                    <input 
+                      type="email" 
+                      value={resetEmail} 
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@company.com" 
+                      className="w-full h-[48px] bg-[#f6f6f7] border border-[#eeeeef] rounded-[12px] px-4 text-[14.5px] text-black outline-none focus:bg-white focus:border-black focus:ring-[3px] focus:ring-black/10 transition-all"
+                    />
+                  </div>
+
+                  <button 
+                    type="button" 
+                    onClick={handleSendOtp} 
+                    disabled={modalLoading}
+                    className="w-full h-[48px] rounded-full bg-black text-white text-[15px] font-semibold hover:bg-[#111] transition-all flex items-center justify-center shadow-md"
+                  >
+                    {modalLoading ? "Sending..." : "Send OTP"}
+                  </button>
+
+                  <div className="text-center pt-2">
+                    <button 
+                      type="button" 
+                      onClick={handleSendResetLink}
+                      disabled={modalLoading}
+                      className="text-[13.5px] font-semibold text-black underline underline-offset-[3px] hover:opacity-70 transition-opacity"
+                    >
+                      Reset Password? (Send direct link)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h3 className="text-[24px] font-[800] tracking-[-0.02em] text-black mb-1">Verify OTP</h3>
+                <p className="text-[14px] text-[#6b6b76] mb-6">We sent a 6-digit verification code to <span className="font-semibold text-black">{resetEmail}</span>.</p>
+
+                <div className="space-y-6">
+                  {/* 6 OTP Box Inputs */}
+                  <div className="flex gap-2 justify-between">
+                    {otp.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        id={`otp-${idx}`}
+                        type="text"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        className="w-[48px] h-[54px] sm:w-[52px] sm:h-[58px] bg-[#f6f6f7] border border-[#eeeeef] rounded-[14px] text-center text-[20px] font-bold text-black outline-none focus:bg-white focus:border-black focus:ring-[3px] focus:ring-black/10 transition-all"
+                      />
+                    ))}
+                  </div>
+
+                  <button 
+                    type="button" 
+                    onClick={handleVerifyOtp} 
+                    disabled={modalLoading}
+                    className="w-full h-[48px] rounded-full bg-black text-white text-[15px] font-semibold hover:bg-[#111] transition-all flex items-center justify-center shadow-md"
+                  >
+                    {modalLoading ? "Verifying..." : "Verify & Sign In"}
+                  </button>
+
+                  <div className="text-center">
+                    <button 
+                      type="button" 
+                      onClick={() => setResetStep("initial")} 
+                      className="text-[13px] font-medium text-[#6b6b76] hover:text-black transition-colors"
+                    >
+                      ← Back to options
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

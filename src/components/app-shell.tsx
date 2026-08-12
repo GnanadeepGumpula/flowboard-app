@@ -44,7 +44,7 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const isAuthRoute = pathname === "/login" || pathname === "/signup";
+  const isAuthRoute = pathname === "/login" || pathname === "/signup" || pathname === "/reset-password";
   
   const [user, setUser] = useState<any>(null);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
