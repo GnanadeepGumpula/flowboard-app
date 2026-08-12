@@ -8,36 +8,32 @@ import { toast } from "sonner";
 function ResetPasswordContent() {
   const router = useRouter();
 
-  // Form State
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSessionValid, setIsSessionValid] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
-  // Parallax State
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const rightPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const supabase = createClient();
 
-    // 1. Listen for auth state recovery event from URL hash
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === "PASSWORD_RECOVERY" || session) {
-          setIsSessionValid(true);
-          setIsCheckingSession(false);
-        }
-      }
-    );
-
-    // 2. Check existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setIsSessionValid(true);
-      }
+    const verifySession = async () => {
+      // The session is already established by /auth/callback/route.ts
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsSessionValid(!!session);
       setIsCheckingSession(false);
+    };
+
+    verifySession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || session) {
+        setIsSessionValid(true);
+        setIsCheckingSession(false);
+      }
     });
 
     return () => {
@@ -71,15 +67,6 @@ function ResetPasswordContent() {
     setLoading(true);
     const supabase = createClient();
 
-    // Ensure session exists right before sending update
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      setLoading(false);
-      toast.error("Auth session expired or missing! Please click the email link again.");
-      return;
-    }
-
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
     });
@@ -105,7 +92,6 @@ function ResetPasswordContent() {
 
   return (
     <div className="min-h-screen w-full flex flex-col-reverse lg:flex-row bg-white selection:bg-black selection:text-white antialiased overflow-hidden" style={{ fontFamily: "var(--font-sans), Inter, -apple-system, sans-serif" }}>
-      {/* LEFT SIDE: Form */}
       <div className="w-full lg:w-[52%] bg-white flex flex-col relative shrink-0">
         <div className="px-6 sm:px-10 lg:px-12 xl:px-14 pt-7 pb-6 flex items-center gap-2.5">
           <div className="w-[32px] h-[32px] rounded-[10px] bg-black flex items-center justify-center">
@@ -168,7 +154,6 @@ function ResetPasswordContent() {
         </div>
       </div>
 
-      {/* RIGHT SIDE: Visual */}
       <div 
         ref={rightPanelRef} 
         onMouseMove={handleMouseMove} 
@@ -191,7 +176,7 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center font-medium text-slate-500">Loading...</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
       <ResetPasswordContent />
     </Suspense>
   );

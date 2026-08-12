@@ -77,8 +77,8 @@ function LoginContent() {
     setResetStep("otp");
   };
 
-  // 2. Send Direct Reset Link
-  const handleSendResetLink = async () => {
+// 2. Send Direct Reset Link
+const handleSendResetLink = async () => {
   if (!resetEmail) {
     toast.error("Please enter your email address");
     return;
@@ -86,9 +86,10 @@ function LoginContent() {
   setModalLoading(true);
   const supabase = createClient();
 
-  // Triggers the 'Reset password' template in Supabase
+  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+
   const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-    redirectTo: `${window.location.origin}/reset-password`,
+    redirectTo: `${origin}/reset-password`,
   });
 
   setModalLoading(false);
