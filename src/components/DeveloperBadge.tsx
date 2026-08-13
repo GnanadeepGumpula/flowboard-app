@@ -14,19 +14,26 @@ const DeveloperBadge: React.FC = () => {
   if (dismissed) return null;
 
   return (
-    <div style={styles.badge}>
+    <div style={styles.badge} suppressHydrationWarning>
       <a
         href="https://gnanadeepstudio.vercel.app"
         target="_blank"
         rel="noopener noreferrer"
         style={styles.link}
+        suppressHydrationWarning
       >
         <div style={styles.profilePicContainer}>
           <img src="/gnanadeep.jpeg" alt="Gnanadeep Gumpula" style={styles.profilePic} />
         </div>
         <span style={styles.text}>Build by Gnanadeep Gumpula</span>
       </a>
-      <button type="button" onClick={handleDismiss} style={styles.dismiss} aria-label="Dismiss developer badge">
+      <button
+        type="button"
+        onClick={handleDismiss}
+        style={styles.dismiss}
+        aria-label="Dismiss developer badge"
+        suppressHydrationWarning
+      >
         ×
       </button>
     </div>

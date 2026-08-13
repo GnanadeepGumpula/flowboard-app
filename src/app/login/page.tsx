@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -77,19 +76,20 @@ function LoginContent() {
     setResetStep("otp");
   };
 
-// 2. Send Direct Reset Link
+  // 2. Send Direct Reset Link
+  
 const handleSendResetLink = async () => {
   if (!resetEmail) {
     toast.error("Please enter your email address");
     return;
   }
   setModalLoading(true);
+  
   const supabase = createClient();
-
   const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
 
   const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-    redirectTo: `${origin}/reset-password`,
+    redirectTo: `${origin}/auth/callback?next=/reset-password`,
   });
 
   setModalLoading(false);
@@ -219,7 +219,7 @@ const handleSendResetLink = async () => {
               <p className="mt-3.5 text-[15px] leading-6 text-[#6b6b76] font-[450]">Log in to your Flowboard workspace to continue</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5" suppressHydrationWarning>
               <div>
                 <label className="text-[13.5px] font-semibold text-black mb-2 block">Email</label>
                 <input 
@@ -228,6 +228,7 @@ const handleSendResetLink = async () => {
                   placeholder="you@company.com" 
                   type="email" 
                   required
+                  suppressHydrationWarning
                   className="w-full h-[52px] bg-[#f6f6f7] border border-[#eeeeef] rounded-[14px] px-4 text-[15px] font-[450] text-black outline-none focus:bg-white focus:border-black focus:ring-[3px] focus:ring-black/10 transition-all placeholder:text-[#a0a0aa]" 
                 />
               </div>
@@ -241,6 +242,7 @@ const handleSendResetLink = async () => {
                     placeholder="••••••••••" 
                     type="password" 
                     required
+                    suppressHydrationWarning
                     className="w-full h-[52px] bg-[#f6f6f7] border border-[#eeeeef] rounded-[14px] px-4 text-[15px] font-[450] text-black outline-none focus:bg-white focus:border-black focus:ring-[3px] focus:ring-black/10 transition-all" 
                   />
                 </div>
@@ -520,6 +522,7 @@ const handleSendResetLink = async () => {
                       value={resetEmail} 
                       onChange={(e) => setResetEmail(e.target.value)}
                       placeholder="you@company.com" 
+                      suppressHydrationWarning
                       className="w-full h-[48px] bg-[#f6f6f7] border border-[#eeeeef] rounded-[12px] px-4 text-[14.5px] text-black outline-none focus:bg-white focus:border-black focus:ring-[3px] focus:ring-black/10 transition-all"
                     />
                   </div>
@@ -562,6 +565,7 @@ const handleSendResetLink = async () => {
                         value={digit}
                         onChange={(e) => handleOtpChange(idx, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        suppressHydrationWarning
                         className="w-[48px] h-[54px] sm:w-[52px] sm:h-[58px] bg-[#f6f6f7] border border-[#eeeeef] rounded-[14px] text-center text-[20px] font-bold text-black outline-none focus:bg-white focus:border-black focus:ring-[3px] focus:ring-black/10 transition-all"
                       />
                     ))}

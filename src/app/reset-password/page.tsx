@@ -20,15 +20,35 @@ function ResetPasswordContent() {
   useEffect(() => {
     const supabase = createClient();
 
-    const verifySession = async () => {
-      // The session is already established by /auth/callback/route.ts
+    const verifyAndExchangeSession = async () => {
+      // 1. Check if the code parameter exists in the URL query string
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get("code");
+
+      if (code) {
+        // Exchange authorization code for a session on the client
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          toast.error("Invalid or expired reset link. Please trigger a new link.");
+          setIsSessionValid(false);
+          setIsCheckingSession(false);
+          return;
+        }
+
+        setIsSessionValid(true);
+        setIsCheckingSession(false);
+        return;
+      }
+
+      // 2. Check for an active auth session (e.g., if already logged in or previously exchanged)
       const { data: { session } } = await supabase.auth.getSession();
       setIsSessionValid(!!session);
       setIsCheckingSession(false);
     };
 
-    verifySession();
+    verifyAndExchangeSession();
 
+    // Listen to password recovery auth events
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY" || session) {
         setIsSessionValid(true);
@@ -115,7 +135,7 @@ function ResetPasswordContent() {
               </div>
             ) : null}
 
-            <form onSubmit={handlePasswordReset} className="space-y-5">
+            <form onSubmit={handlePasswordReset} className="space-y-5" suppressHydrationWarning>
               <div>
                 <label className="text-[13.5px] font-semibold text-black mb-2 block">New Password</label>
                 <input 
@@ -125,6 +145,7 @@ function ResetPasswordContent() {
                   type="password" 
                   required
                   disabled={!isSessionValid}
+                  suppressHydrationWarning
                   className="w-full h-[52px] bg-[#f6f6f7] border border-[#eeeeef] rounded-[14px] px-4 text-[15px] font-[450] text-black outline-none focus:bg-white focus:border-black focus:ring-[3px] focus:ring-black/10 transition-all disabled:opacity-50" 
                 />
               </div>
@@ -138,6 +159,7 @@ function ResetPasswordContent() {
                   type="password" 
                   required
                   disabled={!isSessionValid}
+                  suppressHydrationWarning
                   className="w-full h-[52px] bg-[#f6f6f7] border border-[#eeeeef] rounded-[14px] px-4 text-[15px] font-[450] text-black outline-none focus:bg-white focus:border-black focus:ring-[3px] focus:ring-black/10 transition-all disabled:opacity-50" 
                 />
               </div>
@@ -145,6 +167,7 @@ function ResetPasswordContent() {
               <button 
                 type="submit" 
                 disabled={loading || !isSessionValid} 
+                suppressHydrationWarning
                 className="w-full h-[56px] rounded-full bg-black text-white text-[17px] font-semibold tracking-[-0.01em] hover:bg-[#111] active:scale-[0.99] transition-all shadow-[0_8px_24px_rgba(0,0,0,0.16)] mt-2 flex items-center justify-center disabled:opacity-50"
               >
                 {loading ? "Changing Password..." : "Change Password"}
